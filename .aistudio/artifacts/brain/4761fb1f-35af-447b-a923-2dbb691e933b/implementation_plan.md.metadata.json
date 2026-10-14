@@ -1,0 +1,6 @@
+{
+  "summary":  "Revised implementation plan for Starches. Expands the application from a single-country focus to a dynamic worldwide multi-region architecture. Detects any selected location globally (including Tanzania, Zambia, France, UK, and beyond), dynamically adapts local merchants, menus, and currencies, and provides an elegant 'Expanding Soon' availability state for unserviced regions.",
+  "updatedAt":  "2026-10-12T09:41:06.997524012Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

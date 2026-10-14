@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, [data-theme="dark"], .dark *, [data-theme="dark"] *));
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --app-bg: #EEF2F9;
+  --surface: #F8FAFF;
+  --surface-secondary: #E5ECF6;
+  --text-primary: #1A202C;
+  --text-secondary: #5A6A80;
+  --border-color: #DCE4EF;
+  --brand-orange: #FF5A1F;
+  --brand-orange-hover: #E84D15;
+  --brand-orange-pressed: #D43E09;
+
+  /* Backward compatibility variables */
+  --color-primary: #FF5A1F;
+  --color-primary-pressed: #E84D15;
+  --color-bg: #EEF2F9;
+  --color-surface: #F8FAFF;
+  --color-surface-secondary: #E5ECF6;
+  --color-text-primary: #1A202C;
+  --color-text-secondary: #5A6A80;
+  --color-text-muted: #8492A6;
+  --color-border: #DCE4EF;
+}
+
+:root[data-theme="dark"],
+.dark {
+  color-scheme: dark;
+
+  --app-bg: #0D1117;
+  --surface: #111722;
+  --surface-secondary: #171F2E;
+  --text-primary: #F0F4F8;
+  --text-secondary: #8B9BB4;
+  --border-color: #1F293D;
+  --brand-orange: #FF5A1F;
+  --brand-orange-hover: #FF703B;
+  --brand-orange-pressed: #E84D15;
+
+  /* Backward compatibility variables */
+  --color-primary: #FF5A1F;
+  --color-primary-pressed: #E84D15;
+  --color-bg: #0D1117;
+  --color-surface: #111722;
+  --color-surface-elevated: #171F2E;
+  --color-surface-secondary: #171F2E;
+  --color-text-primary: #F0F4F8;
+  --color-text-secondary: #8B9BB4;
+  --color-text-muted: #64748B;
+  --color-border: #1F293D;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--app-bg);
+  color: var(--text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom scrollbar hiding for horizontal category lists */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Safe area padding utilities */
+.pb-safe {
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+.pt-safe {
+  padding-top: max(12px, env(safe-area-inset-top, 12px));
+}
+
+/* Real-time map dark and light theme background styling */
+.dark-map-container,
+.dark-map-container .gm-style {
+  background-color: #0D1117 !important;
+}
+
+.light-map-container,
+.light-map-container .gm-style {
+  background-color: #EEF2F9 !important;
+}
