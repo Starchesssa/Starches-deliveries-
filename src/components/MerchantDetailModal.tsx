@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ArrowLeft,
   Star,
@@ -8,12 +8,16 @@ import {
   Store,
   UtensilsCrossed,
   ShoppingBag,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { Merchant, MenuItem, ServiceHub, CartItem } from '../types';
-import { MENU_ITEMS } from '../data/merchants';
 import { formatCurrency } from '../data/hubs';
+import { fetchMenuItemsFromFirestore } from '../services/firebase';
 import { ItemCustomizationSheet } from './ItemCustomizationSheet';
 import { SupportedLanguage, TRANSLATIONS } from '../utils/translations';
+import { NeuCard } from './neumorphic/NeuCard';
+import { NeuButton, NeuIconButton } from './neumorphic/NeuButton';
 
 interface MerchantDetailModalProps {
   merchant: Merchant;
@@ -42,10 +46,28 @@ export const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null);
+  const [merchantItems, setMerchantItems] = useState<MenuItem[]>([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState<boolean>(true);
 
-  // Filter items for this merchant
-  const merchantItems = useMemo(() => {
-    return MENU_ITEMS.filter((item) => item.merchantId === merchant.id);
+  // Fetch menu items from Firestore for this merchant
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingMenu(true);
+    fetchMenuItemsFromFirestore(merchant.id)
+      .then((items) => {
+        if (isMounted) {
+          setMerchantItems(items);
+          setIsLoadingMenu(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load menu from Firestore:', err);
+        if (isMounted) setIsLoadingMenu(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [merchant.id]);
 
   // Unique categories in this merchant's menu
@@ -77,36 +99,39 @@ export const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
       : merchant.cuisine;
 
   return (
-    <div className="fixed inset-0 z-40 bg-[#F8F7F3] dark:bg-[#171717] overflow-y-auto flex flex-col">
-      {/* Hero Header Area - 200px image height */}
-      <div className="relative h-52 sm:h-64 w-full bg-[#F1F0EB] dark:bg-[#303030] shrink-0">
+    <div className="fixed inset-0 z-40 bg-[#EEF2F9] dark:bg-[#0D1117] overflow-y-auto flex flex-col transition-colors">
+      {/* Hero Header Area */}
+      <div className="relative h-56 sm:h-64 w-full bg-[#E5ECF6] dark:bg-[#171F2E] shrink-0">
         <img
           src={merchant.image}
           alt={merchant.name}
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/40 pointer-events-none" />
 
-        {/* Back Button (min 44x44px target) */}
-        <button
-          onClick={onBack}
-          aria-label="Back to merchants list"
-          className="absolute top-4 left-4 z-10 w-11 h-11 rounded-full bg-white/95 dark:bg-[#222222]/95 backdrop-blur-md flex items-center justify-center text-[#242424] dark:text-white shadow-md active:scale-95 transition-transform"
-        >
-          <ArrowLeft className="w-5 h-5 text-[#242424] dark:text-white" />
-        </button>
+        {/* Floating Neumorphic Back Button */}
+        <div className="absolute top-4 left-4 z-10">
+          <NeuIconButton
+            variant="glass"
+            size="md"
+            onClick={onBack}
+            aria-label="Back to merchants list"
+          >
+            <ArrowLeft className="w-5 h-5 text-[#1A202C] dark:text-[#F0F4F8]" />
+          </NeuIconButton>
+        </div>
 
         {/* Merchant Type badge */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-[#222222]/95 border border-[#E7E4DD]/80 dark:border-[#3A3A3A] text-[#242424] dark:text-white backdrop-blur-md text-xs font-semibold shadow-xs">
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl neu-glass border border-white/60 dark:border-[#232F44]/70 text-[#1A202C] dark:text-[#F0F4F8] text-xs font-semibold">
           {merchant.type === 'grocery' ? (
             <>
-              <Store className="w-3.5 h-3.5 text-[#FF8A00]" />
+              <Store className="w-3.5 h-3.5 text-[#FF5A1F]" />
               <span>Food Grocery</span>
             </>
           ) : (
             <>
-              <UtensilsCrossed className="w-3.5 h-3.5 text-[#FF8A00]" />
+              <UtensilsCrossed className="w-3.5 h-3.5 text-[#FF5A1F]" />
               <span>Restaurant</span>
             </>
           )}
@@ -114,45 +139,41 @@ export const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
       </div>
 
       {/* Merchant Title & Metadata Info Section */}
-      <div className="px-4 py-4 bg-white dark:bg-[#222222] border-b border-[#E7E4DD] dark:border-[#3A3A3A] transition-colors shrink-0">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#242424] dark:text-white tracking-tight">
+      <div className="px-4 py-4.5 bg-[#F8FAFF] dark:bg-[#111722] border-b border-[#DCE4EF] dark:border-[#1F293D] transition-colors shrink-0">
+        <div className="max-w-2xl mx-auto space-y-1.5">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A202C] dark:text-[#F0F4F8] tracking-tight">
             {merchant.name}
           </h1>
 
-          <p className="text-sm text-[#707070] dark:text-[#B7B7B7] mt-1">
+          <p className="text-sm text-[#5A6A80] dark:text-[#8B9BB4]">
             {cuisineLabel}
           </p>
 
-          <p className="text-xs text-[#909090] mt-0.5">{merchant.address}</p>
+          <p className="text-xs text-[#8492A6]">{merchant.address}</p>
 
-          {/* Clean Unboxed Metadata Line with · Separators */}
-          <div className="flex items-center gap-2 mt-3 text-xs sm:text-sm text-[#707070] dark:text-[#B7B7B7] font-medium">
-            <div className="flex items-center gap-1 text-[#242424] dark:text-white font-semibold">
-              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+          {/* Metadata Row */}
+          <div className="flex items-center gap-2.5 pt-2 text-xs sm:text-sm text-[#5A6A80] dark:text-[#8B9BB4] font-medium">
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg neu-pressed text-[#1A202C] dark:text-[#F0F4F8] font-bold">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
               <span>{merchant.rating}</span>
-              <span className="text-[#909090] font-normal">
+              <span className="text-[#8492A6] font-normal">
                 ({merchant.ratingCount})
               </span>
             </div>
 
-            <span aria-hidden="true" className="text-[#909090]">
-              ·
-            </span>
+            <span aria-hidden="true">·</span>
 
             <div className="flex items-center gap-1">
-              <Clock className="w-4 h-4 text-[#909090]" />
+              <Clock className="w-3.5 h-3.5 text-[#FF5A1F]" />
               <span>
                 {merchant.deliveryTimeMinutes} {t.delivery_time}
               </span>
             </div>
 
-            <span aria-hidden="true" className="text-[#909090]">
-              ·
-            </span>
+            <span aria-hidden="true">·</span>
 
-            <div className="flex items-center gap-1 font-mono tabular-nums">
-              <Bike className="w-4 h-4 text-[#909090]" />
+            <div className="flex items-center gap-1 font-mono tabular-nums font-semibold text-[#FF5A1F]">
+              <Bike className="w-3.5 h-3.5" />
               <span>
                 {merchant.deliveryFee === 0
                   ? t.free_delivery
@@ -164,16 +185,16 @@ export const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
       </div>
 
       {/* Menu Category Sticky Navigation */}
-      <div className="sticky top-0 z-20 bg-white/95 dark:bg-[#222222]/95 backdrop-blur-md border-b border-[#E7E4DD] dark:border-[#3A3A3A] px-4 py-2 transition-colors">
+      <div className="sticky top-0 z-20 neu-glass border-b border-[#DCE4EF]/70 dark:border-[#1F293D]/70 px-4 py-2.5 transition-colors">
         <div className="max-w-2xl mx-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
           {menuCategories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-[#FF8A00] text-white shadow-xs'
-                  : 'bg-[#F1F0EB] dark:bg-[#303030] text-[#707070] dark:text-[#B7B7B7] hover:text-[#242424]'
+                  ? 'neu-button-primary'
+                  : 'neu-button text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8]'
               }`}
             >
               {cat === 'all' ? t.all_categories : cat}
@@ -183,11 +204,18 @@ export const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
       </div>
 
       {/* Menu Item Cards List */}
-      <div className="flex-1 max-w-2xl mx-auto w-full p-4 space-y-3 pb-32">
-        {displayedItems.length === 0 ? (
-          <div className="py-12 text-center text-[#909090] text-sm">
-            No items available in this category.
+      <div className="flex-1 max-w-2xl mx-auto w-full p-4 space-y-3.5 pb-32">
+        {isLoadingMenu ? (
+          <div className="py-20 text-center flex flex-col items-center justify-center">
+            <Loader2 className="w-7 h-7 text-[#FF5A1F] animate-spin mb-2.5" />
+            <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+              Loading live menu items...
+            </p>
           </div>
+        ) : displayedItems.length === 0 ? (
+          <NeuCard elevation="flat" className="py-12 text-center p-6 text-sm text-[#5A6A80] dark:text-[#8B9BB4]">
+            No items available in this category.
+          </NeuCard>
         ) : (
           displayedItems.map((item) => {
             const displayName =
@@ -205,63 +233,67 @@ export const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
                 : item.description;
 
             return (
-              <div
+              <NeuCard
                 key={item.id}
+                elevation="flat"
+                clickable
                 onClick={() => setCustomizingItem(item)}
-                className="bg-white dark:bg-[#222222] border border-[#E7E4DD] dark:border-[#3A3A3A] rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs hover:border-[#FF8A00] transition-colors cursor-pointer group"
+                className="p-3.5 sm:p-4 flex items-center justify-between gap-3 group"
               >
                 <div className="min-w-0 flex-1">
-                  <h4 className="font-semibold text-sm sm:text-base text-[#242424] dark:text-white group-hover:text-[#FF8A00] transition-colors">
+                  <h4 className="font-bold text-sm sm:text-base text-[#1A202C] dark:text-[#F0F4F8] group-hover:text-[#FF5A1F] transition-colors">
                     {displayName}
                   </h4>
                   {item.unitSize && (
-                    <span className="text-[11px] text-[#707070] dark:text-[#B7B7B7] block">
+                    <span className="text-[11px] font-medium text-[#5A6A80] dark:text-[#8B9BB4] block">
                       {item.unitSize}
                     </span>
                   )}
-                  <p className="text-xs text-[#707070] dark:text-[#B7B7B7] mt-1 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] mt-1 line-clamp-2 leading-relaxed">
                     {displayDesc}
                   </p>
-                  <div className="mt-2 font-mono tabular-nums font-bold text-sm text-[#FF8A00]">
+                  <div className="mt-2.5 font-mono tabular-nums font-bold text-sm text-[#FF5A1F]">
                     {formatCurrency(item.price, activeHub.currency)}
                   </div>
                 </div>
 
-                {/* Thumbnail & Add Button */}
+                {/* Thumbnail & Neumorphic Add Button */}
                 <div className="relative shrink-0 flex flex-col items-center">
                   {item.image && (
                     <img
                       src={item.image}
                       alt={item.name}
                       referrerPolicy="no-referrer"
-                      className="w-20 h-20 rounded-xl object-cover bg-[#F1F0EB] dark:bg-[#303030]"
+                      className="w-20 h-20 rounded-xl object-cover neu-flat-sm"
                     />
                   )}
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setCustomizingItem(item);
                     }}
                     aria-label={`Add ${item.name} to cart`}
-                    className="mt-1.5 min-w-[40px] h-[34px] px-3 rounded-lg bg-[#F8F7F3] dark:bg-[#303030] hover:bg-[#FF8A00] hover:text-white border border-[#E7E4DD] dark:border-[#3A3A3A] text-xs font-semibold text-[#242424] dark:text-white flex items-center justify-center gap-1 transition-colors"
+                    className="mt-2 px-3 py-1.5 rounded-lg neu-button text-xs font-semibold text-[#1A202C] dark:text-[#F0F4F8] hover:text-[#FF5A1F] flex items-center justify-center gap-1 cursor-pointer transition-colors"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 text-[#FF5A1F]" />
                     <span>{t.add}</span>
                   </button>
                 </div>
-              </div>
+              </NeuCard>
             );
           })
         )}
       </div>
 
-      {/* Floating Bottom Cart Bar (if cart has items) */}
+      {/* Floating Bottom Cart Bar */}
       {cartItemCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 p-4 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#171717] dark:via-[#171717]/95">
+        <div className="fixed bottom-0 left-0 right-0 z-30 p-4">
           <div className="max-w-md mx-auto">
             <button
+              type="button"
               onClick={onOpenCart}
-              className="w-full h-[52px] rounded-xl bg-[#FF8A00] hover:bg-[#E87900] active:scale-[0.99] text-white font-semibold text-base flex items-center justify-between px-5 shadow-lg transition-all"
+              className="w-full h-13 rounded-2xl neu-button-primary text-white font-bold text-sm sm:text-base flex items-center justify-between px-5 cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5" />

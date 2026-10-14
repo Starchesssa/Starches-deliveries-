@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { APIProvider } from '@vis.gl/react-google-maps';
 import { DeliveryLocation, ServiceHub, Merchant, MenuItem, CartItem, Order, SelectedOption, ThemeMode } from './types';
-import { SERVICE_HUBS, detectServiceHub } from './data/hubs';
-import { MERCHANTS } from './data/merchants';
+import { SERVICE_HUBS, detectServiceHub, formatCurrency } from './data/hubs';
+import { MERCHANTS as LOCAL_MERCHANTS } from './data/merchants';
 import { SupportedLanguage } from './utils/translations';
-import { OnboardingFlow } from './components/OnboardingFlow';
 import { SplashScreen } from './components/SplashScreen';
 import { loadPreferences, savePreferences, CustomerPreferences } from './utils/preferences';
 import { DeliveryLocationPrompt } from './components/DeliveryLocationPrompt';
@@ -20,27 +19,35 @@ import { OrderTrackingModal } from './components/OrderTrackingModal';
 import { BottomNav, NavTab } from './components/BottomNav';
 import { AccountView } from './components/AccountView';
 import { QuotaWarningBanner } from './components/QuotaWarningBanner';
-import { Heart, Clock } from 'lucide-react';
+import { NeuCard } from './components/neumorphic/NeuCard';
+import { NeuButton } from './components/neumorphic/NeuButton';
+import {
+  validateFirestoreConnection,
+  seedStarchesCatalogIfEmpty,
+  fetchMerchantsFromFirestore,
+  fetchOrdersFromFirestore,
+  fetchAddressesFromFirestore,
+  saveAddressToFirestore,
+} from './services/firebase';
+import { Heart, Clock, UtensilsCrossed } from 'lucide-react';
 
 export default function App() {
   const apiKey =
     import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
     'AIzaSyAJSRi8e3Skf5VJYDwN7Efn7XJW97nm8ys';
 
-  // Splash Screen on startup (1-3 seconds display of brand logo)
+  // Splash Screen on startup (1.8s brand introduction)
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
-  // 0. Persistent Customer Preferences & One-Time Onboarding
+  // 0. Preferences
   const [preferences, setPreferences] = useState<CustomerPreferences>(loadPreferences);
 
   // 1. Theme state: 'light' | 'dark' | 'system'
-  // Consistent warm-white theme across early UI, map, and restaurant browsing
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('starches_theme_mode');
     if (saved === 'dark' || saved === 'light' || saved === 'system') {
       return saved as ThemeMode;
     }
-    // Default to 'light' for Starches signature warm-white branding
     return 'light';
   });
 
@@ -48,7 +55,6 @@ export default function App() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  // Listen to system OS color scheme changes
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e: MediaQueryListEvent) => {
@@ -109,12 +115,11 @@ export default function App() {
         // ignore
       }
     }
-    return null; // Null indicates new customer who has not confirmed an address yet
+    return null;
   });
 
   // 5. Delivery Location Selection Gate:
   // As soon as customer enters the app, ask "Where should we deliver" first before browsing restaurants/groceries.
-  // (A. Current location, B. Search in search bar, C. Choose on map).
   const [hasConfirmedSessionLocation, setHasConfirmedSessionLocation] = useState<boolean>(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState<boolean>(true);
   const [isMapPickerOpen, setIsMapPickerOpen] = useState<boolean>(false);
@@ -134,6 +139,11 @@ export default function App() {
   const [showMapView, setShowMapView] = useState(false);
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
+
+  // Live Firestore Merchants Data State
+  const [merchants, setMerchants] = useState<Merchant[]>(LOCAL_MERCHANTS);
+  const [isLoadingMerchants, setIsLoadingMerchants] = useState<boolean>(false);
+  const [merchantsError, setMerchantsError] = useState<string | null>(null);
 
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
@@ -205,12 +215,64 @@ export default function App() {
     }
   }, [deliveryLocation]);
 
+  // Load live merchants and orders from Firebase
+  const loadLiveMerchants = useCallback(async () => {
+    setIsLoadingMerchants(true);
+    setMerchantsError(null);
+    try {
+      await validateFirestoreConnection();
+      await seedStarchesCatalogIfEmpty();
+      const liveList = await fetchMerchantsFromFirestore();
+      if (liveList && liveList.length > 0) {
+        setMerchants(liveList);
+      }
+    } catch (err: any) {
+      console.warn('Live Firestore sync notice:', err);
+      setMerchantsError('Could not sync live Firestore catalog, displaying cached items.');
+    } finally {
+      setIsLoadingMerchants(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLiveMerchants();
+
+    // Also fetch historical orders and saved addresses from Firestore
+    fetchOrdersFromFirestore().then((remoteOrders) => {
+      if (remoteOrders && remoteOrders.length > 0) {
+        setOrders((prev) => {
+          const combined = [...remoteOrders];
+          for (const p of prev) {
+            if (!combined.some((c) => c.id === p.id)) {
+              combined.push(p);
+            }
+          }
+          return combined;
+        });
+      }
+    });
+
+    fetchAddressesFromFirestore().then((remoteAddresses) => {
+      if (remoteAddresses && remoteAddresses.length > 0) {
+        setSavedAddresses((prev) => {
+          const combined = [...remoteAddresses];
+          for (const p of prev) {
+            if (!combined.some((c) => c.id === p.id || c.address === p.address)) {
+              combined.push(p);
+            }
+          }
+          return combined;
+        });
+      }
+    });
+  }, [loadLiveMerchants]);
+
   // Handle Location Confirmation (Section 2)
   const handleConfirmLocation = (loc: DeliveryLocation) => {
     setDeliveryLocation(loc);
     localStorage.setItem('starches_confirmed_location', JSON.stringify(loc));
 
-    // Save or update in saved addresses
+    // Save or update in saved addresses & sync to Firestore
     setSavedAddresses((prev) => {
       const exists = prev.some((p) => p.address === loc.address || p.id === loc.id);
       if (!exists) {
@@ -218,13 +280,13 @@ export default function App() {
       }
       return prev.map((p) => (p.id === loc.id || p.address === loc.address ? loc : p));
     });
+    saveAddressToFirestore(loc);
 
     setHasConfirmedSessionLocation(true);
     setIsSelectingLocation(false);
     setIsMapPickerOpen(false);
   };
 
-  // Select an already saved address directly
   const handleSelectSavedAddress = (saved: DeliveryLocation) => {
     setDeliveryLocation(saved);
     localStorage.setItem('starches_confirmed_location', JSON.stringify(saved));
@@ -255,37 +317,6 @@ export default function App() {
       hubId: hub.id,
     };
     handleConfirmLocation(newLoc);
-  };
-
-  // Onboarding Handlers (Section 1 & 2 & 3)
-  const handleCompleteOnboarding = (
-    updatedPreferences: Partial<CustomerPreferences>,
-    locationChoice?: 'gps' | 'search' | 'map' | 'manual'
-  ) => {
-    const merged: CustomerPreferences = {
-      ...preferences,
-      ...updatedPreferences,
-      onboardingCompleted: true,
-    };
-    setPreferences(merged);
-    savePreferences(merged);
-
-    if (merged.theme) {
-      setThemeMode(merged.theme);
-      localStorage.setItem('starches_theme_mode', merged.theme);
-    }
-    if (merged.language) {
-      setLanguage(merged.language as SupportedLanguage);
-      localStorage.setItem('starches_lang', merged.language);
-    }
-
-    // After onboarding, present location selection screen
-    setIsSelectingLocation(true);
-    if (locationChoice === 'map') {
-      setIsMapPickerOpen(true);
-    } else {
-      setIsMapPickerOpen(false);
-    }
   };
 
   const handleResetOnboarding = () => {
@@ -369,7 +400,7 @@ export default function App() {
     setTrackingOrder(order);
   };
 
-  const activeCartMerchant = MERCHANTS.find(
+  const activeCartMerchant = merchants.find(
     (m) => m.id === cartItems[0]?.merchantId
   );
   const deliveryFee = activeCartMerchant ? activeCartMerchant.deliveryFee : 2000;
@@ -377,18 +408,18 @@ export default function App() {
 
   return (
     <APIProvider apiKey={apiKey}>
-      {/* Brand Launch Splash Screen: Displays brand logo on app launch for 2-3 seconds */}
+      {/* Brand Launch Splash Screen */}
       {showSplash && (
         <SplashScreen
           onFinish={() => setShowSplash(false)}
-          durationMs={2200}
+          durationMs={2000}
         />
       )}
 
       {/* 1. Location Selection Gate: As soon as customer enters the app, ask where should we deliver before browsing */}
       {!hasConfirmedSessionLocation || isSelectingLocation || !deliveryLocation ? (
         isMapPickerOpen ? (
-          /* C. Choose on map: full-screen interactive vector map like Bolt */
+          /* C. Choose on map: fast interactive map like Bolt */
           <MapLocationPicker
             initialLocation={deliveryLocation}
             savedAddresses={savedAddresses}
@@ -462,7 +493,7 @@ export default function App() {
                   <div className="px-4">
                     <HomeMapOverlay
                       activeHub={currentHub}
-                      merchants={MERCHANTS.filter((m) => m.hubId === currentHub.id)}
+                      merchants={merchants.filter((m) => m.hubId === currentHub.id)}
                       isDarkMode={isDarkMode}
                       onSelectMerchant={(m) => setSelectedMerchant(m)}
                       onClose={() => setShowMapView(false)}
@@ -471,7 +502,7 @@ export default function App() {
                 )}
 
                 <HomeFeed
-                  merchants={MERCHANTS}
+                  merchants={merchants}
                   activeHub={currentHub}
                   language={language}
                   favorites={favorites}
@@ -479,60 +510,71 @@ export default function App() {
                   onSelectMerchant={(m) => setSelectedMerchant(m)}
                   onToggleMapView={() => setShowMapView(!showMapView)}
                   isMapViewActive={showMapView}
+                  isLoading={isLoadingMerchants}
+                  error={merchantsError}
+                  onRetry={loadLiveMerchants}
                 />
               </div>
             )}
 
             {activeTab === 'search' && (
               <div className="p-4">
-                <h2 className="text-xl font-bold mb-3 text-[#1A202C] dark:text-[#F0F4F8]">
+                <h2 className="text-xl font-extrabold mb-3 text-[#1A202C] dark:text-[#F0F4F8]">
                   Search Food & Groceries
                 </h2>
                 <HomeFeed
-                  merchants={MERCHANTS}
+                  merchants={merchants}
                   activeHub={currentHub}
                   language={language}
                   favorites={favorites}
                   onToggleFavorite={handleToggleFavorite}
                   onSelectMerchant={(m) => setSelectedMerchant(m)}
+                  isLoading={isLoadingMerchants}
+                  error={merchantsError}
+                  onRetry={loadLiveMerchants}
                 />
               </div>
             )}
 
             {activeTab === 'orders' && (
               <div className="p-4 space-y-4 pb-28">
-                <h2 className="text-xl font-bold text-[#1A202C] dark:text-[#F0F4F8]">
+                <h2 className="text-xl font-extrabold text-[#1A202C] dark:text-[#F0F4F8]">
                   Your Orders
                 </h2>
                 {orders.length === 0 ? (
-                  <div className="py-16 text-center bg-[#F8FAFF] dark:bg-[#111722] rounded-2xl border border-[#DCE4EF] dark:border-[#1F293D] p-6 shadow-xs">
+                  <NeuCard elevation="flat" className="py-16 text-center p-6">
                     <Clock className="w-12 h-12 text-[#8492A6] mx-auto mb-3" />
                     <h4 className="font-bold text-base text-[#1A202C] dark:text-[#F0F4F8]">
                       No orders yet
                     </h4>
                     <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] mt-1 max-w-xs mx-auto">
-                      When you place an order, live delivery tracking and receipts will appear here.
+                      When you place an order, live Firestore delivery tracking and receipts will appear here.
                     </p>
-                    <button
-                      onClick={() => setActiveTab('home')}
-                      className="mt-4 px-4 py-2.5 rounded-xl bg-[#FF5A1F] text-white text-xs font-semibold shadow-xs hover:bg-[#E84D15] transition-colors cursor-pointer"
-                    >
-                      Explore Restaurants
-                    </button>
-                  </div>
+                    <div className="mt-4 flex justify-center">
+                      <NeuButton
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setActiveTab('home')}
+                      >
+                        Explore Restaurants
+                      </NeuButton>
+                    </div>
+                  </NeuCard>
                 ) : (
                   orders.map((ord) => (
-                    <div
+                    <NeuCard
                       key={ord.id}
+                      elevation="flat"
+                      clickable
                       onClick={() => setTrackingOrder(ord)}
-                      className="bg-[#F8FAFF] dark:bg-[#111722] border border-[#DCE4EF] dark:border-[#1F293D] rounded-2xl p-4 shadow-xs hover:border-[#FF5A1F] transition-colors cursor-pointer"
+                      className="p-4"
                     >
                       <div className="flex items-start justify-between">
                         <div>
                           <span className="text-xs font-mono font-bold text-[#FF5A1F]">
                             #{ord.referenceNumber}
                           </span>
-                          <h4 className="font-semibold text-base text-[#1A202C] dark:text-[#F0F4F8] mt-0.5">
+                          <h4 className="font-bold text-base text-[#1A202C] dark:text-[#F0F4F8] mt-0.5">
                             {ord.merchantName}
                           </h4>
                           <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
@@ -540,20 +582,20 @@ export default function App() {
                           </p>
                         </div>
 
-                        <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold capitalize">
+                        <span className="px-2.5 py-1 rounded-full neu-pressed text-emerald-600 dark:text-emerald-400 text-xs font-bold capitalize">
                           {ord.status.replace('_', ' ')}
                         </span>
                       </div>
 
-                      <div className="mt-3 pt-3 border-t border-[#DCE4EF] dark:border-[#1F293D] flex items-center justify-between text-xs">
-                        <span className="text-[#5A6A80] dark:text-[#8B9BB4]">
+                      <div className="mt-3 pt-3 border-t border-[#DCE4EF]/60 dark:border-[#1F293D]/60 flex items-center justify-between text-xs">
+                        <span className="text-[#5A6A80] dark:text-[#8B9BB4] font-medium">
                           {ord.paymentMethod.toUpperCase()} · Paid
                         </span>
-                        <button className="text-[#FF5A1F] font-semibold hover:underline">
+                        <span className="text-[#FF5A1F] font-bold hover:underline">
                           Track Live Delivery →
-                        </button>
+                        </span>
                       </div>
-                    </div>
+                    </NeuCard>
                   ))
                 )}
               </div>
@@ -561,11 +603,11 @@ export default function App() {
 
             {activeTab === 'favorites' && (
               <div className="p-4 space-y-4 pb-28">
-                <h2 className="text-xl font-bold text-[#1A202C] dark:text-[#F0F4F8]">
+                <h2 className="text-xl font-extrabold text-[#1A202C] dark:text-[#F0F4F8]">
                   Saved Favorites
                 </h2>
                 {favorites.length === 0 ? (
-                  <div className="py-16 text-center bg-[#F8FAFF] dark:bg-[#111722] rounded-2xl border border-[#DCE4EF] dark:border-[#1F293D] p-6 shadow-xs">
+                  <NeuCard elevation="flat" className="py-16 text-center p-6">
                     <Heart className="w-12 h-12 text-[#8492A6] mx-auto mb-3" />
                     <h4 className="font-bold text-base text-[#1A202C] dark:text-[#F0F4F8]">
                       No favorites yet
@@ -573,41 +615,44 @@ export default function App() {
                     <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] mt-1 max-w-xs mx-auto">
                       Tap the heart icon on any restaurant or grocery store to save it for quick access.
                     </p>
-                  </div>
+                  </NeuCard>
                 ) : (
-                  MERCHANTS.filter((m) => favorites.includes(m.id)).map((m) => (
-                    <div
+                  merchants.filter((m) => favorites.includes(m.id)).map((m) => (
+                    <NeuCard
                       key={m.id}
+                      elevation="flat"
+                      clickable
                       onClick={() => setSelectedMerchant(m)}
-                      className="bg-[#F8FAFF] dark:bg-[#111722] border border-[#DCE4EF] dark:border-[#1F293D] rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:border-[#FF5A1F] shadow-xs transition-colors"
+                      className="p-3.5 flex items-center gap-3"
                     >
                       <img
                         src={m.image}
                         alt={m.name}
                         referrerPolicy="no-referrer"
-                        className="w-16 h-16 rounded-xl object-cover"
+                        className="w-16 h-16 rounded-xl object-cover shrink-0 neu-flat-sm"
                       />
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-semibold text-sm text-[#1A202C] dark:text-[#F0F4F8] truncate">
+                        <h4 className="font-bold text-sm text-[#1A202C] dark:text-[#F0F4F8] truncate">
                           {m.name}
                         </h4>
                         <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] truncate">
                           {m.cuisine}
                         </p>
-                        <div className="text-xs text-[#8492A6] mt-1">
+                        <div className="text-xs text-[#8492A6] mt-1 font-semibold">
                           ★ {m.rating} · {m.deliveryTimeMinutes} mins
                         </div>
                       </div>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleToggleFavorite(m.id);
                         }}
-                        className="p-2 text-[#FF5A1F]"
+                        className="p-2 text-[#FF5A1F] cursor-pointer"
                       >
                         <Heart className="w-5 h-5 fill-current" />
                       </button>
-                    </div>
+                    </NeuCard>
                   ))
                 )}
               </div>

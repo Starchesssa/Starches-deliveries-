@@ -21,6 +21,9 @@ import {
 import { DeliveryLocation, ServiceHub } from '../types';
 import { SERVICE_HUBS, detectServiceHub } from '../data/hubs';
 import { SupportedLanguage, TRANSLATIONS } from '../utils/translations';
+import { LIGHT_MAP_STYLES, DARK_MAP_STYLES } from '../utils/mapStyles';
+import { NeuCard } from './neumorphic/NeuCard';
+import { NeuButton, NeuIconButton } from './neumorphic/NeuButton';
 
 interface MapLocationPickerProps {
   initialLocation?: DeliveryLocation | null;
@@ -31,14 +34,12 @@ interface MapLocationPickerProps {
   onClose?: () => void;
 }
 
-// Map Controller for camera pan & dynamic dark/light theme switching
+// Map Controller for camera pan & fast dynamic dark/light theme switching
 function MapController({
   targetCenter,
-  onRenderingTypeDetected,
   isDarkMode,
 }: {
   targetCenter: { lat: number; lng: number } | null;
-  onRenderingTypeDetected?: (type: string) => void;
   isDarkMode: boolean;
 }) {
   const map = useMap();
@@ -46,23 +47,8 @@ function MapController({
   useEffect(() => {
     if (!map) return;
     try {
-      if (typeof map.getRenderingType === 'function') {
-        const type = map.getRenderingType();
-        if (onRenderingTypeDetected) {
-          onRenderingTypeDetected(type);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, [map, onRenderingTypeDetected]);
-
-  // Dynamically update colorScheme and background for instant vector theme switching
-  useEffect(() => {
-    if (!map) return;
-    try {
       map.setOptions({
-        colorScheme: isDarkMode ? 'DARK' : 'LIGHT',
+        styles: isDarkMode ? DARK_MAP_STYLES : LIGHT_MAP_STYLES,
         backgroundColor: isDarkMode ? '#0D1117' : '#EEF2F9',
       });
     } catch {
@@ -92,7 +78,6 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
     import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
     'AIzaSyAJSRi8e3Skf5VJYDwN7Efn7XJW97nm8ys';
 
-  // Default coordinates: if initialLocation exists, use it; otherwise fallback coordinates
   const defaultCenter = initialLocation
     ? { lat: initialLocation.lat, lng: initialLocation.lng }
     : { lat: -6.7725, lng: 39.2450 }; // Kinondoni / Mikocheni fallback
@@ -129,9 +114,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   );
   const [customLabel, setCustomLabel] = useState('');
 
-  // Bottom panel expansion state:
-  // When collapsed, must occupy <= 20% of viewport height (leaving >= 80% map visible).
-  // When expanded, allows selecting saved addresses, address labels, or search details.
+  // Bottom panel expansion state
   const [isPanelExpanded, setIsPanelExpanded] = useState<boolean>(false);
 
   // Geolocation state
@@ -184,166 +167,97 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
             if (city) setDetectedCity(city);
             if (country) setDetectedCountry(country);
             if (countryCode) setDetectedCountryCode(countryCode);
-
-            const recheck = detectServiceHub(lat, lng, formatted);
-            setActiveHub(recheck.hub);
-            setIsServiced(recheck.isServiced);
-            setIsGeocoding(false);
-            return;
+          } else {
+            setResolvedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
           }
+        } else {
+          setResolvedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
         }
       } catch {
-        // network or CORS error fallback
+        setResolvedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      } finally {
+        setIsGeocoding(false);
       }
-
-      if (detection.hub) {
-        setDetectedCity(detection.hub.cityName);
-        setDetectedCountry(detection.hub.countryName);
-        setDetectedCountryCode(detection.hub.countryCode);
-        setResolvedAddress(
-          `${detection.hub.popularDistricts[0]}, ${detection.hub.cityName}`
-        );
-      } else {
-        setDetectedCountry('Location');
-        setDetectedCity(`${lat.toFixed(3)}°, ${lng.toFixed(3)}°`);
-        setDetectedCountryCode('GL');
-        setResolvedAddress(`Pin at: ${lat.toFixed(4)}°, ${lng.toFixed(4)}°`);
-      }
-
-      setIsGeocoding(false);
     },
     [apiKey]
   );
 
-  // Device Geolocation on Startup: request location if available
-  useEffect(() => {
-    if (hasAttemptedStartupGps.current) return;
-    hasAttemptedStartupGps.current = true;
-
-    if (initialLocation && initialLocation.lat) {
-      resolveCoordinates(initialLocation.lat, initialLocation.lng);
-      return;
-    }
-
+  // Handle GPS location request
+  const requestCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setGpsStatus('unavailable');
-      setGpsNotice('GPS unavailable. You can drag the map to set your location.');
+      setGpsNotice(t.gps_unsupported);
       return;
     }
 
     setGpsStatus('requesting');
-    setGpsNotice('Finding your location...');
+    setGpsNotice(t.requesting_gps);
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        };
+        const { latitude, longitude } = pos.coords;
         setGpsStatus('granted');
-        setGpsNotice('Location found');
-        setTargetCenter(coords);
-        setCurrentCenter(coords);
-        resolveCoordinates(coords.lat, coords.lng);
-        setTimeout(() => setGpsNotice(null), 3000);
+        setGpsNotice(t.location_detected);
+        setTargetCenter({ lat: latitude, lng: longitude });
+        setCurrentCenter({ lat: latitude, lng: longitude });
+        currentCenterRef.current = { lat: latitude, lng: longitude };
+        resolveCoordinates(latitude, longitude);
+
+        setTimeout(() => setGpsNotice(null), 3500);
       },
       (err) => {
-        if (err.code === 1) {
+        if (err.code === err.PERMISSION_DENIED) {
           setGpsStatus('denied');
-          setGpsNotice('Location permission denied. Move the map to set your location.');
-        } else if (err.code === 2) {
-          setGpsStatus('unavailable');
-          setGpsNotice('GPS signal unavailable. You can drag the map manually.');
-        } else {
+          setGpsNotice(t.gps_permission_denied);
+        } else if (err.code === err.TIMEOUT) {
           setGpsStatus('timeout');
-          setGpsNotice('GPS request timed out. You can move the map freely.');
-        }
-        setTimeout(() => setGpsNotice(null), 5000);
-      },
-      { timeout: 8000, enableHighAccuracy: true }
-    );
-  }, [initialLocation, resolveCoordinates]);
-
-  // Recenter button click handler
-  const handleRecenter = () => {
-    if (!navigator.geolocation) {
-      setGpsNotice('Geolocation not supported by browser.');
-      return;
-    }
-    setGpsStatus('requesting');
-    setGpsNotice('Acquiring current GPS location...');
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        };
-        setGpsStatus('granted');
-        setGpsNotice('Centered on device location');
-        setTargetCenter(coords);
-        setCurrentCenter(coords);
-        resolveCoordinates(coords.lat, coords.lng);
-        setTimeout(() => setGpsNotice(null), 3000);
-      },
-      (err) => {
-        if (err.code === 1) {
-          setGpsStatus('denied');
-          setGpsNotice('Location permission denied.');
+          setGpsNotice(t.gps_timeout);
         } else {
           setGpsStatus('unavailable');
-          setGpsNotice('Unable to acquire GPS signal. Pan the map manually.');
+          setGpsNotice(t.gps_failed);
         }
-        setTimeout(() => setGpsNotice(null), 5000);
+        setTimeout(() => setGpsNotice(null), 4500);
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
     );
+  }, [resolveCoordinates, t]);
+
+  useEffect(() => {
+    if (!hasAttemptedStartupGps.current && !initialLocation) {
+      hasAttemptedStartupGps.current = true;
+      requestCurrentLocation();
+    }
+  }, [initialLocation, requestCurrentLocation]);
+
+  const handleCameraChange = (ev: MapCameraChangedEvent) => {
+    const lat = ev.detail.center.lat;
+    const lng = ev.detail.center.lng;
+
+    currentCenterRef.current = { lat, lng };
+    setCurrentCenter({ lat, lng });
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      resolveCoordinates(lat, lng);
+    }, 600);
   };
 
-  // Camera change listener for stationary center pin - uses ref to avoid re-rendering entire component during dragging
-  const handleCameraChange = useCallback(
-    (ev: MapCameraChangedEvent) => {
-      const center = ev.detail.center;
-      if (!center) return;
+  const handleRecenter = () => {
+    requestCurrentLocation();
+  };
 
-      const newLat = center.lat;
-      const newLng = center.lng;
-      currentCenterRef.current = { lat: newLat, lng: newLng };
-
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-
-      debounceTimerRef.current = setTimeout(() => {
-        setCurrentCenter({ lat: newLat, lng: newLng });
-        resolveCoordinates(newLat, newLng);
-      }, 350);
-    },
-    [resolveCoordinates]
-  );
-
-  // Address search submit handler
-  const handleSearchSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!searchQuery.trim()) return;
 
     setIsGeocoding(true);
-
-    const lower = searchQuery.toLowerCase();
-    for (const hub of SERVICE_HUBS) {
-      if (
-        hub.cityName.toLowerCase().includes(lower) ||
-        hub.countryName.toLowerCase().includes(lower) ||
-        hub.popularDistricts.some((d) => d.toLowerCase().includes(lower))
-      ) {
-        setTargetCenter({ lat: hub.center.lat, lng: hub.center.lng });
-        resolveCoordinates(hub.center.lat, hub.center.lng);
-        setIsGeocoding(false);
-        setIsPanelExpanded(false);
-        return;
-      }
-    }
-
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
@@ -356,16 +270,17 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
           const loc = data.results[0].geometry.location;
           setTargetCenter({ lat: loc.lat, lng: loc.lng });
           resolveCoordinates(loc.lat, loc.lng);
-          setIsGeocoding(false);
-          setIsPanelExpanded(false);
-          return;
+        } else {
+          setGpsNotice(t.address_not_found);
+          setTimeout(() => setGpsNotice(null), 3000);
         }
       }
     } catch {
-      // ignore
+      setGpsNotice(t.search_error);
+      setTimeout(() => setGpsNotice(null), 3000);
+    } finally {
+      setIsGeocoding(false);
     }
-
-    setIsGeocoding(false);
   };
 
   const handleSelectSavedAddress = (saved: DeliveryLocation) => {
@@ -407,18 +322,20 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         background: 'var(--app-bg)',
       }}
     >
-      {/* 1. Full-screen existing map: extends behind the bottom panel rather than stopping above it */}
-      <div className={`absolute inset-0 z-0 transition-colors duration-300 ${isDarkMode ? 'dark-map-container' : 'light-map-container'}`}>
+      {/* 1. Fast Full-Screen Map (Bolt/Uber styled, instant raster tiles, zero WebGL delay) */}
+      <div
+        className={`absolute inset-0 z-0 transition-colors duration-300 ${
+          isDarkMode ? 'dark-map-container' : 'light-map-container'
+        }`}
+      >
         <Map
           id="starches-delivery-map"
-          mapId="DEMO_MAP_ID"
-          colorScheme={isDarkMode ? 'DARK' : 'LIGHT'}
           reuseMaps={true}
           defaultCenter={defaultCenter}
           defaultZoom={15}
           gestureHandling="greedy"
           disableDefaultUI={true}
-          internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+          styles={isDarkMode ? DARK_MAP_STYLES : LIGHT_MAP_STYLES}
           onCameraChanged={handleCameraChange}
           className="w-full h-full"
         >
@@ -429,15 +346,14 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         </Map>
       </div>
 
-      {/* 2. Fixed Center Pin: Positioned precisely at the center of the visible map */}
+      {/* 2. Fixed Center Pin with Neumorphic Pulse */}
       <div
         className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
         aria-hidden="true"
       >
         <div className="relative flex flex-col items-center">
-          {/* Ground Contact Pulse Shadow */}
-          <div className="w-3 h-3 rounded-full bg-[var(--brand-orange)]/40 animate-ping absolute -bottom-1" />
-          <div className="w-2.5 h-2.5 rounded-full bg-[var(--brand-orange)] absolute -bottom-0.5 shadow-sm" />
+          <div className="w-3.5 h-3.5 rounded-full bg-[#FF5A1F]/40 animate-ping absolute -bottom-1" />
+          <div className="w-3 h-3 rounded-full bg-[#FF5A1F] absolute -bottom-0.5 shadow-sm" />
 
           {/* Stationary Pin Icon */}
           <div className="w-10 h-11 -translate-y-4 flex items-center justify-center filter drop-shadow-md">
@@ -453,187 +369,148 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         </div>
       </div>
 
-      {/* 3. Top Controls: Search field & Back / GPS Toast near safe area */}
+      {/* 3. Top Floating Glassmorphic Controls */}
       <div
         className="absolute left-4 right-4 z-20 space-y-2 pointer-events-none"
         style={{
           top: 'max(14px, env(safe-area-inset-top))',
         }}
       >
-        <div className="pointer-events-auto max-w-lg mx-auto flex items-center gap-2">
+        <div className="pointer-events-auto max-w-lg mx-auto flex items-center gap-2.5">
           {onClose && (
-            <button
-              type="button"
+            <NeuIconButton
+              variant="glass"
+              size="md"
               onClick={onClose}
               aria-label="Back"
-              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md transition-colors"
-              style={{
-                background: 'var(--surface)',
-                color: 'var(--text-primary)',
-                borderColor: 'var(--border-color)',
-                borderWidth: '1px',
-              }}
             >
-              <X className="w-5 h-5" />
-            </button>
+              <X className="w-5 h-5 text-[#1A202C] dark:text-[#F0F4F8]" />
+            </NeuIconButton>
           )}
 
-          {/* Minimal Search Bar */}
+          {/* Neumorphic Search Bar */}
           <form
             onSubmit={handleSearchSubmit}
-            className="flex-1 relative shadow-md rounded-xl"
+            className="flex-1 relative"
           >
-            <div
-              className="flex items-center h-11 rounded-xl px-3 transition-colors"
-              style={{
-                background: 'var(--surface)',
-                borderColor: 'var(--border-color)',
-                borderWidth: '1px',
-              }}
-            >
-              <Search className="w-4 h-4 text-[var(--text-secondary)] shrink-0 mr-2" />
+            <div className="neu-glass rounded-xl flex items-center h-11 px-3.5 gap-2 border border-white/60 dark:border-[#232F44]/70">
+              <Search className="w-4 h-4 text-[#5A6A80] dark:text-[#8B9BB4] shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search_location_placeholder}
-                className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--text-secondary)]"
-                style={{ color: 'var(--text-primary)' }}
+                className="w-full bg-transparent text-sm outline-none text-[#1A202C] dark:text-[#F0F4F8] placeholder:text-[#5A6A80]/70 dark:placeholder:text-[#8B9BB4]/70"
               />
               {isGeocoding && (
-                <Loader2 className="w-3.5 h-3.5 text-[var(--brand-orange)] animate-spin shrink-0 ml-1.5" />
+                <Loader2 className="w-3.5 h-3.5 text-[#FF5A1F] animate-spin shrink-0" />
               )}
             </div>
           </form>
 
-          {/* Recenter Button near top */}
-          <button
-            type="button"
+          {/* Recenter Button */}
+          <NeuIconButton
+            variant="glass"
+            size="md"
             onClick={handleRecenter}
             disabled={gpsStatus === 'requesting'}
             title={t.recenter_location}
             aria-label={t.recenter_location}
-            className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md transition-all active:scale-95"
-            style={{
-              background: 'var(--surface)',
-              borderColor: 'var(--border-color)',
-              borderWidth: '1px',
-              color: 'var(--brand-orange)',
-            }}
           >
             <Navigation
-              className={`w-4 h-4 ${
+              className={`w-4 h-4 text-[#FF5A1F] ${
                 gpsStatus === 'requesting' ? 'animate-spin' : ''
               }`}
             />
-          </button>
+          </NeuIconButton>
         </div>
 
         {/* GPS Status Toast */}
         {gpsNotice && (
           <div className="pointer-events-auto max-w-lg mx-auto">
-            <div
-              className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl shadow-md text-xs font-medium animate-in fade-in"
-              style={{
-                background: 'var(--surface)',
-                color: 'var(--text-primary)',
-                borderColor: 'var(--border-color)',
-                borderWidth: '1px',
-              }}
+            <NeuCard
+              elevation="glass"
+              className="flex items-center justify-between gap-2 px-3.5 py-2 text-xs font-medium border border-white/60 dark:border-[#232F44]/70"
             >
               <div className="flex items-center gap-1.5 truncate">
                 {gpsStatus === 'requesting' ? (
-                  <Loader2 className="w-3.5 h-3.5 text-[var(--brand-orange)] animate-spin shrink-0" />
+                  <Loader2 className="w-3.5 h-3.5 text-[#FF5A1F] animate-spin shrink-0" />
                 ) : gpsStatus === 'granted' ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 ) : (
                   <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 )}
-                <span className="truncate">{gpsNotice}</span>
+                <span className="truncate text-[#1A202C] dark:text-[#F0F4F8]">{gpsNotice}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setGpsNotice(null)}
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-0.5"
+                className="text-[#5A6A80] hover:text-[#1A202C] dark:text-[#8B9BB4] dark:hover:text-[#F0F4F8] p-0.5"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
-            </div>
+            </NeuCard>
           </div>
         )}
       </div>
 
-      {/* 4. Bottom Address Panel:
-          - When collapsed: occupies <= 20% of usable viewport height (leaving >= 80% map visible).
-          - When expanded: expands upward to max 75dvh for search results, saved address chips, and label options.
-      */}
+      {/* 4. Bottom Address Panel with Glassmorphism */}
       <section
-        className="absolute bottom-0 left-0 right-0 z-30 rounded-t-3xl border-t transition-all duration-300 ease-out shadow-2xl flex flex-col"
+        className="absolute bottom-0 left-0 right-0 z-30 neu-glass rounded-t-3xl border-t border-white/60 dark:border-[#232F44]/70 transition-all duration-300 ease-out flex flex-col"
         style={{
-          background: 'var(--surface)',
-          color: 'var(--text-primary)',
-          borderColor: 'var(--border-color)',
-          maxHeight: isPanelExpanded ? 'min(75dvh, 560px)' : 'min(20dvh, 160px)',
-          paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
+          maxHeight: isPanelExpanded ? 'min(75dvh, 560px)' : 'min(22dvh, 175px)',
+          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
         }}
       >
-        <div className="max-w-lg mx-auto w-full px-4 pt-2 flex flex-col flex-1 overflow-hidden">
+        <div className="max-w-lg mx-auto w-full px-4 pt-2.5 flex flex-col flex-1 overflow-hidden">
           {/* Drag Handle & Toggle Header */}
           <div
             onClick={() => setIsPanelExpanded(!isPanelExpanded)}
             className="cursor-pointer py-1 flex flex-col items-center select-none"
             title={isPanelExpanded ? 'Collapse panel' : 'Expand panel details'}
           >
-            <div
-              className="w-9 h-1 rounded-full mb-1"
-              style={{ background: 'var(--border-color)' }}
-            />
+            <div className="w-10 h-1.5 rounded-full bg-[#DCE4EF] dark:bg-[#1F293D] mb-1.5" />
           </div>
 
           {/* Compact Primary Row (Always Visible in Collapsed Mode) */}
-          <div className="flex items-center justify-between gap-3 pb-2 shrink-0">
+          <div className="flex items-center justify-between gap-3 pb-2.5 shrink-0">
             <div
               onClick={() => setIsPanelExpanded(!isPanelExpanded)}
               className="min-w-0 flex-1 cursor-pointer"
             >
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-[var(--brand-orange)] uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-[#FF5A1F] uppercase tracking-wider">
                   Set delivery address
                 </span>
-                <span className="text-[10px] text-[var(--text-secondary)]">
+                <span className="text-[10px] text-[#5A6A80] dark:text-[#8B9BB4]">
                   {isServiced ? '· Serviced' : '· Expanding soon'}
                 </span>
               </div>
-              <div className="text-xs sm:text-sm font-semibold truncate mt-0.5">
+              <div className="text-xs sm:text-sm font-semibold truncate mt-0.5 text-[#1A202C] dark:text-[#F0F4F8]">
                 {resolvedAddress}
               </div>
             </div>
 
-            {/* Expand / Collapse toggle icon */}
-            <button
-              type="button"
+            <NeuIconButton
+              size="sm"
+              variant="secondary"
               onClick={() => setIsPanelExpanded(!isPanelExpanded)}
               aria-label={isPanelExpanded ? 'Collapse' : 'Expand'}
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors"
-              style={{
-                background: 'var(--surface-secondary)',
-                color: 'var(--text-secondary)',
-              }}
             >
               {isPanelExpanded ? (
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-4 h-4 text-[#5A6A80] dark:text-[#8B9BB4]" />
               ) : (
-                <ChevronUp className="w-4 h-4" />
+                <ChevronUp className="w-4 h-4 text-[#5A6A80] dark:text-[#8B9BB4]" />
               )}
-            </button>
+            </NeuIconButton>
           </div>
 
           {/* Expanded Content (Scrollable when expanded) */}
           {isPanelExpanded && (
             <div className="overflow-y-auto space-y-3 py-2 flex-1 animate-in fade-in duration-150">
               {/* Address Label Selector: Home, Work, Other */}
-              <div className="space-y-1">
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)] block">
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-[#5A6A80] dark:text-[#8B9BB4] block">
                   Address label:
                 </span>
                 <div className="flex items-center gap-2">
@@ -642,12 +519,11 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
                       key={lbl}
                       type="button"
                       onClick={() => setAddressLabel(lbl)}
-                      className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all"
-                      style={{
-                        background: addressLabel === lbl ? 'var(--brand-orange)' : 'var(--surface-secondary)',
-                        color: addressLabel === lbl ? '#ffffff' : 'var(--text-primary)',
-                        borderColor: addressLabel === lbl ? 'var(--brand-orange)' : 'var(--border-color)',
-                      }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                        addressLabel === lbl
+                          ? 'neu-button-primary'
+                          : 'neu-button text-[#1A202C] dark:text-[#F0F4F8]'
+                      }`}
                     >
                       {lbl === 'Home' && <Home className="w-3.5 h-3.5" />}
                       {lbl === 'Work' && <Briefcase className="w-3.5 h-3.5" />}
@@ -658,43 +534,35 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
                 </div>
 
                 {addressLabel === 'Other' && (
-                  <input
-                    type="text"
-                    value={customLabel}
-                    onChange={(e) => setCustomLabel(e.target.value)}
-                    placeholder="e.g. Gym, Friend's house..."
-                    className="w-full h-8 px-2.5 text-xs rounded-xl border outline-none mt-1"
-                    style={{
-                      background: 'var(--surface-secondary)',
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
+                  <div className="neu-input rounded-xl px-3 py-2 mt-1.5">
+                    <input
+                      type="text"
+                      value={customLabel}
+                      onChange={(e) => setCustomLabel(e.target.value)}
+                      placeholder="e.g. Gym, Friend's house..."
+                      className="w-full bg-transparent text-xs outline-none text-[#1A202C] dark:text-[#F0F4F8] placeholder:text-[#5A6A80]/70 dark:placeholder:text-[#8B9BB4]/70"
+                    />
+                  </div>
                 )}
               </div>
 
-              {/* Saved Address Shortcuts if customer has saved any */}
+              {/* Saved Address Shortcuts */}
               {savedAddresses.length > 0 && (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-[var(--text-secondary)] block">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-[#5A6A80] dark:text-[#8B9BB4] block">
                     Saved addresses:
                   </span>
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
                     {savedAddresses.map((sa) => (
                       <button
                         key={sa.id}
                         type="button"
                         onClick={() => handleSelectSavedAddress(sa)}
-                        className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border"
-                        style={{
-                          background: 'var(--surface-secondary)',
-                          color: 'var(--text-primary)',
-                          borderColor: 'var(--border-color)',
-                        }}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium neu-button text-[#1A202C] dark:text-[#F0F4F8] cursor-pointer"
                       >
-                        <Bookmark className="w-3 h-3 text-[var(--brand-orange)]" />
+                        <Bookmark className="w-3 h-3 text-[#FF5A1F]" />
                         <span>{sa.label || sa.city}:</span>
-                        <span className="truncate max-w-[100px] text-[var(--text-secondary)]">
+                        <span className="truncate max-w-[110px] text-[#5A6A80] dark:text-[#8B9BB4]">
                           {sa.address}
                         </span>
                       </button>
@@ -705,18 +573,16 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
             </div>
           )}
 
-          {/* Prominent Full-Width Starches Orange Confirm Location Button (Fits in collapsed state) */}
-          <div className="pt-1 pb-1 shrink-0">
-            <button
-              type="button"
+          {/* Prominent Full-Width Starches Orange Confirm Location Button */}
+          <div className="pt-2 pb-1 shrink-0">
+            <NeuButton
+              variant="primary"
+              size="lg"
+              fullWidth
               onClick={handleConfirm}
-              className="w-full h-[46px] sm:h-[48px] rounded-xl font-semibold text-sm sm:text-base flex items-center justify-center shadow-md active:scale-[0.99] transition-all text-white"
-              style={{
-                background: 'var(--brand-orange)',
-              }}
             >
               {t.confirm_location}
-            </button>
+            </NeuButton>
           </div>
         </div>
       </section>

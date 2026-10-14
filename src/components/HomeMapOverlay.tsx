@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
 import { Merchant, ServiceHub } from '../types';
 import { formatCurrency } from '../data/hubs';
+import { LIGHT_MAP_STYLES, DARK_MAP_STYLES } from '../utils/mapStyles';
+import { NeuCard } from './neumorphic/NeuCard';
+import { NeuIconButton } from './neumorphic/NeuButton';
 import { Star, Clock, X, ChevronRight } from 'lucide-react';
 
 interface HomeMapOverlayProps {
@@ -12,19 +15,32 @@ interface HomeMapOverlayProps {
   onClose: () => void;
 }
 
-function OverlayMapController({ isDarkMode }: { isDarkMode: boolean }) {
+function OverlayMapController({
+  isDarkMode,
+  activeCenter,
+}: {
+  isDarkMode: boolean;
+  activeCenter: { lat: number; lng: number };
+}) {
   const map = useMap();
   useEffect(() => {
     if (!map) return;
     try {
       map.setOptions({
-        colorScheme: isDarkMode ? 'DARK' : 'LIGHT',
+        styles: isDarkMode ? DARK_MAP_STYLES : LIGHT_MAP_STYLES,
         backgroundColor: isDarkMode ? '#0D1117' : '#EEF2F9',
       });
     } catch {
       // ignore
     }
   }, [map, isDarkMode]);
+
+  useEffect(() => {
+    if (map && activeCenter) {
+      map.panTo(activeCenter);
+    }
+  }, [map, activeCenter]);
+
   return null;
 }
 
@@ -40,19 +56,30 @@ export const HomeMapOverlay: React.FC<HomeMapOverlayProps> = ({
   );
 
   return (
-    <div className={`relative w-full h-[360px] sm:h-[420px] rounded-2xl overflow-hidden border border-[#DCE4EF] dark:border-[#1F293D] my-3 shadow-md ${isDarkMode ? 'dark-map-container' : 'light-map-container'}`}>
+    <NeuCard
+      elevation="flat"
+      className={`relative w-full h-[360px] sm:h-[420px] rounded-2xl overflow-hidden my-3 ${
+        isDarkMode ? 'dark-map-container' : 'light-map-container'
+      }`}
+    >
       <Map
-        key={isDarkMode ? 'dark-overlay-map' : 'light-overlay-map'}
-        mapId="DEMO_MAP_ID"
+        key={isDarkMode ? 'dark-fast-overlay-map' : 'light-fast-overlay-map'}
         defaultCenter={activeHub.center}
         defaultZoom={13}
         disableDefaultUI={true}
         gestureHandling="greedy"
-        internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+        reuseMaps={true}
+        styles={isDarkMode ? DARK_MAP_STYLES : LIGHT_MAP_STYLES}
         className="w-full h-full"
-        colorScheme={isDarkMode ? 'DARK' : 'LIGHT'}
       >
-        <OverlayMapController isDarkMode={isDarkMode} />
+        <OverlayMapController
+          isDarkMode={isDarkMode}
+          activeCenter={
+            activeMerchant
+              ? { lat: activeMerchant.lat, lng: activeMerchant.lng }
+              : activeHub.center
+          }
+        />
         {merchants.map((m) => (
           <AdvancedMarker
             key={m.id}
@@ -63,34 +90,39 @@ export const HomeMapOverlay: React.FC<HomeMapOverlayProps> = ({
               background="#FF5A1F"
               glyphColor="#FFFFFF"
               borderColor="#E04812"
-              scale={activeMerchant?.id === m.id ? 1.2 : 1.0}
+              scale={activeMerchant?.id === m.id ? 1.25 : 1.0}
             />
           </AdvancedMarker>
         ))}
       </Map>
 
-      {/* Close Map Overlay Button */}
-      <button
-        onClick={onClose}
-        aria-label="Close Map View"
-        className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-[#F8FAFF]/95 dark:bg-[#111722]/95 border border-[#DCE4EF] dark:border-[#1F293D] flex items-center justify-center text-[#1A202C] dark:text-[#F0F4F8] shadow-md hover:bg-[#E5ECF6] dark:hover:bg-[#171F2E] transition-colors cursor-pointer"
-      >
-        <X className="w-4 h-4" />
-      </button>
+      {/* Floating Neumorphic Close Button */}
+      <div className="absolute top-3 right-3 z-10">
+        <NeuIconButton
+          variant="glass"
+          size="sm"
+          onClick={onClose}
+          aria-label="Close Map View"
+        >
+          <X className="w-4 h-4 text-[#1A202C] dark:text-[#F0F4F8]" />
+        </NeuIconButton>
+      </div>
 
-      {/* Selected Merchant Preview Card at Bottom of Map */}
+      {/* Selected Merchant Preview Card at Bottom of Map with Glassmorphism */}
       {activeMerchant && (
         <div className="absolute bottom-3 left-3 right-3 z-10">
-          <div
+          <NeuCard
+            elevation="glass"
+            clickable
             onClick={() => onSelectMerchant(activeMerchant)}
-            className="bg-[#F8FAFF]/95 dark:bg-[#111722]/95 backdrop-blur-md border border-[#DCE4EF] dark:border-[#1F293D] p-3 rounded-2xl shadow-lg flex items-center justify-between gap-3 cursor-pointer hover:border-[#FF5A1F] transition-colors"
+            className="p-3.5 flex items-center justify-between gap-3 border border-white/60 dark:border-[#232F44]/70"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               <img
                 src={activeMerchant.image}
                 alt={activeMerchant.name}
                 referrerPolicy="no-referrer"
-                className="w-12 h-12 rounded-xl object-cover shrink-0"
+                className="w-13 h-13 rounded-xl object-cover shrink-0 neu-flat-sm"
               />
               <div className="min-w-0">
                 <h4 className="font-semibold text-sm text-[#1A202C] dark:text-[#F0F4F8] truncate">
@@ -98,16 +130,16 @@ export const HomeMapOverlay: React.FC<HomeMapOverlayProps> = ({
                 </h4>
                 <div className="flex items-center gap-1.5 text-xs text-[#5A6A80] dark:text-[#8B9BB4] mt-0.5">
                   <span className="flex items-center gap-0.5 font-semibold text-[#1A202C] dark:text-[#F0F4F8]">
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                     {activeMerchant.rating}
                   </span>
                   <span>·</span>
                   <span className="flex items-center gap-0.5">
-                    <Clock className="w-3 h-3" />
+                    <Clock className="w-3.5 h-3.5" />
                     {activeMerchant.deliveryTimeMinutes}m
                   </span>
                   <span>·</span>
-                  <span className="font-mono tabular-nums">
+                  <span className="font-mono tabular-nums font-medium text-[#FF5A1F]">
                     {formatCurrency(
                       activeMerchant.deliveryFee,
                       activeHub.currency
@@ -117,13 +149,16 @@ export const HomeMapOverlay: React.FC<HomeMapOverlayProps> = ({
               </div>
             </div>
 
-            <button className="px-3 py-1.5 rounded-xl bg-[#FF5A1F] text-white text-xs font-semibold shrink-0 flex items-center gap-1 shadow-xs hover:bg-[#E84D15] transition-colors cursor-pointer">
-              <span>Menu</span>
+            <button
+              type="button"
+              className="px-3.5 py-2 rounded-xl neu-button-primary text-xs font-semibold shrink-0 flex items-center gap-1 cursor-pointer"
+            >
+              <span>View</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
-          </div>
+          </NeuCard>
         </div>
       )}
-    </div>
+    </NeuCard>
   );
 };

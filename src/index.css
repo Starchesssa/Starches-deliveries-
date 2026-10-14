@@ -1,6 +1,26 @@
 @import "tailwindcss";
+@import "ui-neumorphism/dist/index.css";
 
 @custom-variant dark (&:where(.dark, [data-theme="dark"], .dark *, [data-theme="dark"] *));
+
+:root {
+  /* UI Neumorphism library variable overrides to match Starches theme */
+  --light-bg: #EEF2F9;
+  --light-bg-dark-shadow: #D2DBEA;
+  --light-bg-light-shadow: #FFFFFF;
+  --dark-bg: #0D1117;
+  --dark-bg-dark-shadow: #06090D;
+  --dark-bg-light-shadow: #19212E;
+
+  --primary: #FF5A1F;
+  --primary-dark: #E84D15;
+  --primary-light: #FF8A5B;
+
+  --g-text-color-light: #1A202C;
+  --g-text-color-secondary-light: #5A6A80;
+  --g-text-color-dark: #F0F4F8;
+  --g-text-color-secondary-dark: #8B9BB4;
+}
 
 :root,
 :root[data-theme="light"] {
@@ -26,6 +46,20 @@
   --color-text-secondary: #5A6A80;
   --color-text-muted: #8492A6;
   --color-border: #DCE4EF;
+
+  /* Neumorphic Soft-UI tokens (Light) */
+  --neu-shadow-flat: 5px 5px 12px #D2DBEA, -5px -5px 12px #FFFFFF;
+  --neu-shadow-sm: 3px 3px 7px #D2DBEA, -3px -3px 7px #FFFFFF;
+  --neu-shadow-lg: 8px 8px 18px #CCD6E6, -8px -8px 18px #FFFFFF;
+  --neu-shadow-pressed: inset 3px 3px 6px #D2DBEA, inset -3px -3px 6px #FFFFFF;
+  --neu-shadow-orange: 0 4px 14px rgba(255, 90, 31, 0.35);
+  --neu-convex: linear-gradient(145deg, #FFFFFF, #E5ECF7);
+  --neu-concave: linear-gradient(145deg, #E5ECF7, #FFFFFF);
+
+  /* Glassmorphic tokens (Light) */
+  --glass-bg: rgba(248, 250, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 10px 30px rgba(195, 207, 226, 0.4);
 }
 
 :root[data-theme="dark"],
@@ -53,13 +87,110 @@
   --color-text-secondary: #8B9BB4;
   --color-text-muted: #64748B;
   --color-border: #1F293D;
+
+  /* Neumorphic Soft-UI tokens (Dark) */
+  --neu-shadow-flat: 5px 5px 12px #06090D, -5px -5px 12px #19212E;
+  --neu-shadow-sm: 3px 3px 7px #06090D, -3px -3px 7px #19212E;
+  --neu-shadow-lg: 8px 8px 18px #040608, -8px -8px 18px #1E2838;
+  --neu-shadow-pressed: inset 3px 3px 6px #06090D, inset -3px -3px 6px #19212E;
+  --neu-shadow-orange: 0 4px 16px rgba(255, 90, 31, 0.4);
+  --neu-convex: linear-gradient(145deg, #151D2A, #0F141E);
+  --neu-concave: linear-gradient(145deg, #0F141E, #151D2A);
+
+  /* Glassmorphic tokens (Dark) */
+  --glass-bg: rgba(17, 23, 34, 0.85);
+  --glass-border: rgba(35, 47, 68, 0.65);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--app-bg);
   color: var(--text-primary);
   -webkit-tap-highlight-color: transparent;
+}
+
+/* --- Neumorphic Soft-UI Utility Classes --- */
+.neu-flat {
+  background-color: var(--surface);
+  box-shadow: var(--neu-shadow-flat);
+  border: 1px solid var(--border-color);
+}
+
+.neu-flat-sm {
+  background-color: var(--surface);
+  box-shadow: var(--neu-shadow-sm);
+  border: 1px solid var(--border-color);
+}
+
+.neu-flat-lg {
+  background-color: var(--surface);
+  box-shadow: var(--neu-shadow-lg);
+  border: 1px solid var(--border-color);
+}
+
+.neu-pressed {
+  background-color: var(--surface-secondary);
+  box-shadow: var(--neu-shadow-pressed);
+  border: 1px solid var(--border-color);
+}
+
+.neu-button {
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-sm);
+  border: 1px solid var(--border-color);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--neu-shadow-flat);
+}
+
+.neu-button:active,
+.neu-button.active {
+  transform: translateY(1px);
+  box-shadow: var(--neu-shadow-pressed);
+  background-color: var(--surface-secondary);
+}
+
+.neu-button-primary {
+  background: linear-gradient(135deg, #FF6830, #FF5A1F);
+  box-shadow: var(--neu-shadow-orange), var(--neu-shadow-sm);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-button-primary:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.neu-button-primary:active {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.neu-input {
+  background-color: var(--surface);
+  box-shadow: var(--neu-shadow-pressed);
+  border: 1px solid var(--border-color);
+  transition: border-color 0.15s ease;
+}
+
+.neu-input:focus-within {
+  border-color: var(--brand-orange);
+}
+
+/* Glassmorphic floating surfaces */
+.neu-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 /* Custom scrollbar hiding for horizontal category lists */
@@ -79,7 +210,7 @@ body {
   padding-top: max(12px, env(safe-area-inset-top, 12px));
 }
 
-/* Real-time map dark and light theme background styling */
+/* Fast map container styles */
 .dark-map-container,
 .dark-map-container .gm-style {
   background-color: #0D1117 !important;

@@ -1,189 +1,183 @@
-# Starches — Worldwide Customer Mobile Delivery App
+# Starches — Neumorphic UI Library & Live Firebase Integration
 
-A premium, mobile-first food delivery and food retail customer application with **worldwide geographic flexibility**. Customers can drop their delivery pin or search for any location globally on the interactive map. The app automatically detects the selected country and city, customizes the marketplace catalog, currency, and payment options for active regions (including Tanzania, Zambia, France, UK, etc.), and displays an elegant, branded "Expanding Soon" screen with waiting list sign-up whenever a user selects a location outside active service zones.
+Starches is transitioning to a comprehensive Neumorphic (Soft-UI) and Glassmorphic interface while connecting the entire application lifecycle—restaurants, grocery stores, menus, custom options, cart calculation, address management, and live order tracking—to real Firebase Firestore persistence with automated initial data seeding and ultra-fast vector map rendering.
 
-***
-
-### User Review & Critical Decisions
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following revisions have been incorporated directly from your guidance:
+> The following architectural decisions were confirmed during Phase 1 clarification:
+> - **Firebase Provisioning**: Firebase will be provisioned via AI Studio tooling (`show_aistudio_ui` / `set_up_firebase`), generating `firebase-applet-config.json`, `firebase-blueprint.json`, and hardened `firestore.rules`.
+> - **Neumorphism Integration**: Because `ui-neumorphism` targets React 16–17 peer dependencies while this application runs React 19, we will adopt a robust hybrid strategy: integrating `ui-neumorphism`'s core styling and stylesheet tokens combined with React 19-native neumorphic and glassmorphic primitive components (`NeumorphicCard`, `NeumorphicButton`, `NeumorphicInput`, `NeumorphicSwitch`, `GlassSheet`) guaranteeing zero dependency breakage, smooth framer-motion drag animations, and responsive soft-shadow depth.
+> - **Initial Catalog Seeding**: Upon Firestore database initialization, Starches will automatically seed the collections (`hubs`, `merchants`, `menu_items`, `categories`) from the current regional catalog, ensuring instant live data availability across Tanzania (Dar es Salaam), Zambia (Lusaka), France (Paris), and UK (London).
 
-- **Worldwide Location Architecture**: The customer can search or drag the map pin to **any location worldwide** (e.g., Paris, France; Lusaka, Zambia; Dar es Salaam, Tanzania; London, UK; New York, USA; Tokyo, Japan, etc.).
-- **Dynamic Service Zone Detection & Graceful Fallback**:
-  - **Active Service Hubs**: When the user selects an active city (e.g. Dar es Salaam, Lusaka, Paris, London), the app dynamically loads local merchants, regional cuisines (e.g. Swahili pilau & mishkaki in Dar, nshima & grilled tilapia in Lusaka, boulangeries & bistros in Paris), local currencies (TZS, ZMW, EUR, GBP), and regional payment options.
-  - **"Expanding Soon" Out-of-Service Screen**: If the user selects an area where Starches has not yet launched (e.g., non-serviced cities or countries), the app clearly informs them: *"Starches hasn't reached [Location] yet. We're expanding rapidly and will soon reach you!"*, offering an email/phone launch notification signup and an instant one-tap switcher to test active cities.
-- **Stationary Center Pin & Global Geocoding**: The map retains the smooth stationary pin interaction over a panning world map, resolving addresses anywhere on Earth via reverse geocoding.
-- **Brand Identity**: Retains Starches visual design: Primary Orange (`#FF8A00`), Warm-White (`#F8F7F3`), Elevated White (`#FFFFFF`), Charcoal text (`#242424`), and dark mode support (`#171717`).
-
-***
+---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Starches is a global-ready mobile food delivery and grocery retail app. Customers select their delivery point anywhere in the world on an interactive map. If Starches operates in that city, customers can immediately discover local restaurants, fresh food retailers, customize items, manage a cart, checkout in local currency, and track orders. If the area is unserviced, customers receive clear, friendly feedback with launch notifications and sample city previews.
-- **Target Audience / Persona**: Customers worldwide ordering food and groceries, with dynamic adaptation to local culture, cuisine, and payment methods.
-- **Key Value**: No hardcoded borders—instant global geocoding, contextual regional merchants and currencies, transparent service boundaries, and consistent tactile mobile UX.
+- **What It Does**: Starches is a high-performance food and grocery delivery web application tailored for diverse regional hubs. Customers select their delivery location immediately upon launch (via GPS, live address search, or interactive map), browse local restaurants and fresh groceries across filtered tabs, customize dishes, add items to an itemized cart, check out with local payment options (Cash on Delivery, M-Pesa, Airtel Money, Tigo Pesa, MTN Money, Card), and track orders with live Firestore listeners.
+- **Target Audience / Persona**: Everyday urban consumers ordering takeaway meals or fresh grocery provisions who expect tactile, responsive visual feedback, instant map loading, and transparent order tracking.
+- **Key Value**: Tactile Neumorphic design with soft-elevation lighting, real-time Firestore database persistence with offline resilience, and rapid vector map interactions inspired by modern mobility apps like Bolt.
 
-***
+---
 
 ## 2. User Experience & Visual Design
 
 ### Key User Flows
+1. **Location-First Onboarding**: The app greets the user with an immediate location selection prompt ("Where should we deliver?") offering GPS detection, autocomplete search, interactive map pin, or previous saved addresses. The main catalog unlocks only after location confirmation.
+2. **Catalog Exploration (3 Main Tabs + Sub-tabs)**:
+   - **All Tab**: Combines top culinary picks, nearby merchants, and fresh markets.
+   - **Restaurants Tab**: Filtered by Swahili local food, pilau, grilled/choma, fast food, breakfast/bakery.
+   - **Groceries Tab**: Filtered by farm-fresh vegetables, dairy, bakery, meat, and pantry essentials.
+   - Sub-filters: "Near Me", "Top Rated", "Fast Delivery", "Promotions".
+3. **Item Customization & Contiguous Purchase**: Selecting an item opens a Neumorphic/Glass bottom sheet displaying portion options, required/optional add-ons, quantity stepper, and a live subtotal button.
+4. **Checkout & Live Order Tracking**: Customers enter recipient details, select payment method, and submit the order. The order is committed directly to Firestore `/orders/{orderId}`, and the customer enters the live tracking view with simulated rider updates and status progression (`submitted` → `accepted` → `preparing` → `out_for_delivery` → `delivered`).
 
-```
-┌─────────────────────────────────┐
-│  1. Global Map Pin Selection    │ (Search or pan anywhere: France, Zambia, Tanzania, etc.)
-└────────────────┬────────────────┘
-                 │
-                 ▼
-      [ Service Zone Check ]
-       /                 \
-  [Active Zone]     [Unserviced Zone]
-     /                     \
-    ▼                       ▼
-┌───────────────────────┐ ┌───────────────────────────────────────┐
-│ 2. Localized Home Feed│ │ 2b. "Expanding Soon" Notification Screen │
-│ - Country/City Hub    │ │ - "We'll soon reach [City]!"          │
-│ - Local Currency      │ │ - Enter email/phone for launch alert  │
-│ - Regional Food Cards │ │ - Quick switch to active cities       │
-└───────────┬───────────┘ └───────────────────────────────────────┘
-            │
-            ▼
-┌───────────────────────┐
-│ 3. Merchant & Menu    │
-│ - Customization Sheet │
-│ - Single-Merchant Cart│
-└───────────┬───────────┘
-            │
-            ▼
-┌───────────────────────┐
-│ 4. Localized Checkout │ (TZS/Mobile Money in TZ, ZMW in ZM, EUR/Card in FR)
-│ - Place Order         │
-└───────────┬───────────┘
-            │
-            ▼
-┌───────────────────────┐
-│ 5. Order Tracking     │ (Live vertical progress timeline)
-└───────────────────────┘
-```
+### Visual Identity & Theme
+- **Light Theme**:
+  - Background: `#EEF2F9` (Icy White)
+  - Neumorphic Surfaces & Cards: `#F8FAFF` with dual soft shadows (Light highlight `#FFFFFF` at `-4px -4px 10px`, ambient drop shadow `rgba(166, 180, 200, 0.45)` at `4px 4px 10px`)
+  - Inset Pressed States: `inset 2px 2px 5px rgba(166, 180, 200, 0.5), inset -2px -2px 5px #FFFFFF`
+  - Text: Charcoal `#1A202C` and muted slate `#5A6A80`
+- **Dark Theme**:
+  - Background: `#0D1117` (Premium Black)
+  - Neumorphic Surfaces & Cards: `#111722` with dual soft dark shadows (Soft rim highlight `rgba(255, 255, 255, 0.04)` at `-3px -3px 8px`, deep shadow `rgba(0, 0, 0, 0.7)` at `4px 4px 12px`)
+  - Inset Pressed States: `inset 2px 2px 6px rgba(0, 0, 0, 0.8), inset -2px -2px 6px rgba(255, 255, 255, 0.03)`
+  - Text: Soft white `#F0F4F8` and muted steel `#8B9BB4`
+- **Brand Accent**: Vivid Orange `#FF5A1F` for active tabs, primary CTAs, order badges, and map pins.
+- **Glassmorphism**: Translucent floating map controls, header blur, and draggable bottom sheets using `backdrop-blur-md bg-white/70 dark:bg-[#111722]/80 border border-white/40 dark:border-white/10`.
+- **Typography**: Clean Inter typography with tabular numerals (`tabular-nums`) for currency, delivery times, and distances.
 
-1. **Global Location Selection Screen (First Screen)**:
-   - Header with Starches wordmark and quick light/dark theme toggle.
-   - Address search bar with worldwide search support and popular quick-location chips:
-     - 🇹🇿 Dar es Salaam (Kinondoni & Mikocheni)
-     - 🇿🇲 Lusaka (Kabulonga & Woodlands)
-     - 🇫🇷 Paris (Le Marais & 6th Arrondissement)
-     - 🇬🇧 London (Soho & Covent Garden)
-     - 📍 Pinpoint any other location worldwide
-   - Interactive Google Map with a stationary center pin, recenter GPS button, and instant coordinate-to-address resolution.
-   - Dynamic location card showing: Detected country, city/neighborhood, active service status badge, and "Confirm delivery location" button.
-2. **"Expanding Soon" State (For Non-Serviced Locations)**:
-   - When the confirmed location is outside active delivery zones:
-     - Clean, friendly visual illustration with delivery scooter or map pin.
-     - Headline: *"Starches hasn't reached [City, Country] yet!"*
-     - Subtitle: *"We are expanding rapidly and will soon reach you. Enter your details to get notified the day we launch in your neighborhood."*
-     - Quick phone/email notification input with immediate confirmation feedback.
-     - Action button: *"Try Starches in an Active City"* opening a quick selector (Dar es Salaam, Lusaka, Paris, London) so users can test full app capabilities.
-3. **Localized Marketplace Home (Active Locations)**:
-   - Sticky header with active city and address (tap to switch location).
-   - Dynamic currency and categories matching the region:
-     - **Tanzania Hub (TZS)**: Local Swahili (Pilau, Biryani, Mishkaki, Samaki), Fresh Groceries, Tropical Fruits, Drinks.
-     - **Zambia Hub (ZMW)**: Nshima & Village Chicken, Braai/Grilled Meats, Fresh Farm Groceries, Cafe & Bakery.
-     - **France Hub (EUR €)**: Boulangerie & Patisserie, French Bistros, Fromagerie & Artisanal Grocery, Gourmet Burgers.
-     - **UK Hub (GBP £)**: Modern British Eateries, Specialty Grocers, Bakeries, Street Food.
-   - Expandable map overlay and feed cards with unboxed metadata (ratings, delivery time, distance, delivery fee).
-4. **Merchant Menus & Customization Bottom Sheet**:
-   - Merchant details, cuisine tags, delivery times, and food items.
-   - Interactive bottom customization sheet for selecting sizes, sauces, sides, and spice levels.
-5. **Cart & Localized Checkout**:
-   - Single-merchant guard with item quantities and clear pricing in local currency.
-   - Payment methods adapted by country:
-     - Tanzania: Cash on Delivery & Mobile Money (Vodacom M-Pesa, Airtel Money, Tigo Pesa).
-     - Zambia: Cash on Delivery & Mobile Money (MTN Money, Airtel Money).
-     - France & International: Card (Visa/Mastercard) and Cash on Delivery.
-   - Instant order submission with validated phone number.
-6. **Live Order Tracking**:
-   - Order reference code, vertical step progress tracker (`Submitted` → `Accepted` → `Preparing` → `Rider Assigned` → `Out for Delivery` → `Delivered`), and rider contact simulation.
-7. **Bottom Navigation & Customer Profile**:
-   - 5 Persistent Tabs: Home, Search, Orders, Favorites, Account.
-   - Account screen with Saved Addresses (across any city), Language Switcher (English, Swahili, French), Currency selector, and Dark/Light mode.
-
-***
+---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Worldwide Geocoding with Regional Hub Config**
-  - *Chosen Approach*: Maintain a modular `serviceHubs` registry defining supported geographic bounds, default currencies, supported payment types, and localized merchant catalogs. Locations outside these bounds automatically trigger the "Expanding Soon" flow.
-  - *Why*: Gives true international flexibility while keeping order totals, currencies, and real merchant menus grounded and authentic.
-- **Decision 2: Seamless Zone Switching**
-  - *Chosen Approach*: When on the "Expanding Soon" screen, users can tap a 1-click shortcut to explore active demonstration cities without having to manually hunt for coordinates.
-  - *Why*: Ensures users and evaluators never get stuck on a dead-end screen while testing worldwide coordinates.
-- **Decision 3: Zero-Pill Typography & Tactile Mobile Ergonomics**
-  - *Chosen Approach*: Adhere strictly to the anti-AI slop visual constitution: unboxed metadata separated by `·`, generous $\ge 44\text{px}$ touch targets, 52px primary buttons, and solid Starches orange (`#FF8A00`) accents without garish gradients.
+- **Decision 1: React 19 Neumorphic Architecture**
+  - *Chosen Approach*: Implement a curated set of custom React 19 Neumorphic components (`NeumorphicCard`, `NeumorphicButton`, `NeumorphicInput`, `NeumorphicSwitch`, `NeumorphicSegmentedControl`) styled with calibrated CSS soft-shadow curves while incorporating `ui-neumorphism` design tokens.
+  - *Why*: The external `ui-neumorphism` package depends on React 16/17 and causes React 19 runtime warnings and synthetic event issues with touch gestures. Native components deliver 100% React 19 compatibility, zero bundle bloat, and smooth 60fps animations.
+- **Decision 2: Automated Firestore Seeding with Client-Side Fallback**
+  - *Chosen Approach*: When Firebase connects, a lightweight check queries the `merchants` collection. If empty or unseeded, it batch-writes the default catalog to Firestore. If offline or provisioning is pending, it displays cached/local data gracefully with a retry indicator.
+  - *Why*: Guarantees zero blank screens on first launch while immediately populating real Firestore records for live queries.
+- **Decision 3: Vector Map Performance Optimization**
+  - *Chosen Approach*: Native Google Maps Vector Engine with `mapId="DEMO_MAP_ID"`, debounced reverse-geocoding (350ms delay using `useRef` for current center), and preconnected CDN links in `index.html`.
+  - *Why*: Eliminates high-frequency re-renders during panning, keeping map interactions silky smooth like Bolt.
 
-***
+---
 
 ## 4. Technical Architecture & Data Strategy
 
-### System Component Flow
+### System & Component Diagram
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                              App.tsx                                   │
-│      (Global Theme, Language, Active Location, Region Store, Cart)     │
-└───────────────────────────────────┬────────────────────────────────────┘
+│                        Starches Client (React 19)                      │
+│                                                                        │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │                     CustomerHeader & Top Bar                   │   │
+│   │        [Brand: Starches]  ·  [Delivery Address Bar]  ·  [Cart] │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+│                                                                        │
+│   ┌───────────────────────────────┐  ┌─────────────────────────────┐   │
+│   │      Location Gate Modal      │  │      HomeMapOverlay         │   │
+│   │  (GPS / Search / Map Pin)     │  │  (Vector Map, DEMO_MAP_ID)  │   │
+│   └──────────────┬────────────────┘  └──────────────┬──────────────┘   │
+│                  ▼                                  ▼                  │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │                      HomeFeed (Neumorphic)                     │   │
+│   │   [All] [Restaurants] [Groceries]  |  Sub-tabs: Near Me, etc.  │   │
+│   │   ┌───────────────────────┐   ┌────────────────────────────┐   │   │
+│   │   │   NeumorphicCard      │   │   NeumorphicCard           │   │   │
+│   │   │   (Merchant Listing)  │   │   (Grocery Listing)        │   │   │
+│   │   └───────────────────────┘   └────────────────────────────┘   │   │
+│   └───────────────────────────────┬────────────────────────────────┘   │
+│                                   ▼                                    │
+│   ┌───────────────────────────────┴────────────────────────────────┐   │
+│   │         ItemCustomizationSheet  ──►  CartDrawer (Glass)        │   │
+│   │         CheckoutModal (Address + Payment) ──► Order Created    │   │
+│   └───────────────────────────────┬────────────────────────────────┘   │
+│                                   ▼                                    │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │              OrderTrackingModal (Real-time Listener)           │   │
+│   └───────────────────────────────┬────────────────────────────────┘   │
+└───────────────────────────────────┼────────────────────────────────────┘
                                     │
-    ┌───────────────────────────────┴───────────────────────────────┐
-    ▼                                                               ▼
-┌──────────────────────────────┐              ┌──────────────────────────────────┐
-│ LocationPickerScreen         │              │ MainCustomerApp                  │
-│ - Worldwide Google Map & Pin │              │ - Persistent Bottom Nav (5 Tabs) │
-│ - Reverse Geocoding          │              │ - Sticky Delivery Header         │
-│ - Active Hub Checker         │              └─────────────────┬────────────────┘
-└──────────────────────────────┘                                │
-                                  ┌─────────────────────────────┼─────────────────────────────┐
-                                  ▼                             ▼                             ▼
-                    ┌─────────────────────────┐   ┌─────────────────────────┐   ┌─────────────────────────┐
-                    │ Active Hub:             │   │ Unserviced Region:      │   │ OrdersScreen & Tracking │
-                    │ HomeScreen Feed & Map   │   │ OutOfServiceView        │   │ - Active Delivery Map   │
-                    │ - Regional Catalog      │   │ - "We'll soon reach you"│   │ - Status Stepper        │
-                    │ - Local Currency        │   │ - Launch Waitlist Form  │   └─────────────────────────┘
-                    └───────────┬─────────────┘   │ - 1-Click Active Hubs   │                 │
-                                │                 └─────────────────────────┘                 │
-                                ▼                                                             ▼
-                    ┌─────────────────────────┐   ┌─────────────────────────┐   ┌─────────────────────────┐
-                    │ Restaurant & Item Modal │   │ CheckoutScreen          │   │ AccountScreen           │
-                    │ - Customization Sheet   │──>│ - Region-specific Pay   │──>│ - Language & Currencies │
-                    │ - Single-Merchant Cart  │   │ - Order Confirmation    │   │ - Saved Global Places   │
-                    └─────────────────────────┘   └─────────────────────────┘   └─────────────────────────┘
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Firebase Firestore & Security Rules                  │
+│                                                                        │
+│   /hubs/{hubId}                   ── Service areas & currencies        │
+│   /merchants/{merchantId}         ── Restaurant & grocery profiles     │
+│   /menu_items/{itemId}            ── Dishes, groceries & options       │
+│   /orders/{orderId}               ── Customer orders & live status     │
+│   /customer_addresses/{addressId} ── Saved user delivery locations     │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Models & Hub Registry
+### Firestore Schema & Collections
 
-- `ServiceHub`: `{ id, countryCode, countryName, cityName, center: { lat, lng }, currency: { code, symbol, format }, languages: string[], paymentMethods: PaymentMethod[], radiusKm: number }`
-- Supported Hubs:
-  - `tz-dar`: Tanzania, Dar es Salaam (TZS, `TSh`, Mobile Money + COD)
-  - `zm-lusaka`: Zambia, Lusaka (ZMW, `K`, MTN/Airtel + COD)
-  - `fr-paris`: France, Paris (EUR, `€`, Card + Cash)
-  - `uk-london`: United Kingdom, London (GBP, `£`, Card + Cash)
-- `DeliveryLocation`: `{ id, label, address, city, country, countryCode, lat, lng, isServiced, hubId?: string }`
-- `Merchant` & `MenuItem`: Tagged with `hubId`, localized descriptions, and currency-specific pricing.
+1. `hubs`:
+   - `id`: string (e.g. `tz-dar`, `zm-lusaka`, `fr-paris`, `uk-london`)
+   - `cityName`: string
+   - `countryCode`: string
+   - `currency`: `{ code: string, symbol: string, decimals: number }`
+   - `center`: `{ lat: number, lng: number }`
+   - `radiusKm`: number
+   - `supportedPayments`: array of strings
 
-***
+2. `merchants`:
+   - `id`: string
+   - `hubId`: string
+   - `name`: string
+   - `type`: `'restaurant' | 'grocery'`
+   - `cuisine`: string
+   - `rating`: number
+   - `deliveryTimeMinutes`: number
+   - `deliveryFee`: number
+   - `minOrder`: number
+   - `image`: string
+   - `lat`: number
+   - `lng`: number
+   - `tags`: array of strings
 
-## 5. Implementation Stages & Verification Plan
+3. `menu_items`:
+   - `id`: string
+   - `merchantId`: string
+   - `name`: string
+   - `description`: string
+   - `price`: number
+   - `category`: string
+   - `image`: string
+   - `isAvailable`: boolean
+   - `customizationGroups`: array of `{ id, name, required, options }`
 
-1. **Brand Theme & Worldwide Hub Infrastructure**:
-   - Establish Starches light/dark design system and `serviceHubs` definition for Dar es Salaam, Lusaka, Paris, London, and international out-of-service detection.
-2. **Interactive Global Map & Location Picker**:
-   - Implement stationary center pin over moving map with global geocoding, reverse geocoding, and quick-picker chips for both active hubs and worldwide destinations.
-3. **Out-of-Service / "Expanding Soon" Screen**:
-   - Build high-fidelity screen: *"Starches hasn't reached your location yet, but we'll soon reach you!"* with waitlist signup and instant active city preview buttons.
-4. **Contextual Marketplace Discovery**:
-   - Filter restaurants, food retailers, fresh produce, and menus dynamically based on the selected hub with authentic local dishes and currencies.
-5. **Menu Customization, Cart & Region-Aware Checkout**:
-   - Item option bottom sheet, single-merchant policy enforcement, localized payment options (M-Pesa/Airtel in TZ/ZM, Card in FR/UK, Cash on Delivery worldwide).
-6. **Order Tracking, Account & Multi-Language Settings**:
-   - Status tracking stepper with estimated arrival time, saved global addresses, and English/Swahili/French language support.
-7. **Verification**:
-   - Run `compile_applet` and verify responsiveness across mobile viewports and desktop widths.
+4. `orders`:
+   - `id`: string
+   - `referenceNumber`: string
+   - `merchantId`: string
+   - `merchantName`: string
+   - `hubId`: string
+   - `items`: array of CartItems
+   - `subtotal`: number
+   - `deliveryFee`: number
+   - `serviceFee`: number
+   - `total`: number
+   - `status`: `'submitted' | 'accepted' | 'preparing' | 'out_for_delivery' | 'delivered'`
+   - `createdAt`: timestamp / ISO string
+   - `deliveryLocation`: DeliveryLocation object
+   - `recipientPhone`: string
+   - `paymentMethod`: string
+
+### Execution Phases & Step-by-Step Milestones
+1. **Firebase Setup**:
+   - Trigger `show_aistudio_ui` with `firebase_setup`.
+   - Verify acceptance via `GetFirebaseTos` and execute `ProvisionFirebase`.
+   - Create `src/services/firebase.ts`, `firebase-blueprint.json`, and secure `firestore.rules`.
+   - Create `src/services/catalogService.ts` for fetching/seeding live Firestore data with loading/error states.
+2. **Neumorphism & Glassmorphism Styling**:
+   - Add Neumorphic utility classes and CSS variables in `src/index.css`.
+   - Create reusable components in `src/components/neumorphic/`: `NeumorphicCard`, `NeumorphicButton`, `NeumorphicInput`, `NeumorphicSwitch`, `NeumorphicSegment`.
+   - Update `CustomerHeader`, `HomeFeed`, `MerchantDetailModal`, `ItemCustomizationSheet`, `CartDrawer`, `CheckoutModal`, and `OrderTrackingModal` with cohesive Neumorphic surfaces and Glassmorphic overlays.
+3. **Map Performance & Delivery Location**:
+   - Confirm Vector Map with `DEMO_MAP_ID` and ensure instant 60fps load times.
+   - Retain the initial delivery location gate on app launch.
+4. **Verification**:
+   - Run compilation and verify complete order creation, cart math, and live Firestore sync.

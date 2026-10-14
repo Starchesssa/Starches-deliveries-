@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "Merchant": {
+      "title": "Merchant",
+      "description": "Restaurant or Grocery partner on Starches",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hubId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["restaurant", "grocery"] },
+        "cuisine": { "type": "string" },
+        "rating": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "deliveryTimeMinutes": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "minOrder": { "type": "number" },
+        "image": { "type": "string" },
+        "address": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "isClosed": { "type": "boolean" }
+      },
+      "required": ["id", "hubId", "name", "type", "cuisine", "lat", "lng"]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Dishes or retail grocery products for a merchant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchantId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "isAvailable": { "type": "boolean" },
+        "isRetailGrocery": { "type": "boolean" },
+        "unitSize": { "type": "string" }
+      },
+      "required": ["id", "merchantId", "name", "price"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Starches customer delivery order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "merchantId": { "type": "string" },
+        "merchantName": { "type": "string" },
+        "merchantType": { "type": "string" },
+        "hubId": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "serviceFee": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "recipientPhone": { "type": "string" },
+        "estimatedDeliveryMinutes": { "type": "number" }
+      },
+      "required": ["id", "merchantId", "total", "status", "createdAt"]
+    },
+    "CustomerAddress": {
+      "title": "CustomerAddress",
+      "description": "Customer saved delivery destinations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "isServiced": { "type": "boolean" }
+      },
+      "required": ["id", "address", "lat", "lng"]
+    }
+  },
+  "firestore": {
+    "/merchants/{merchantId}": {
+      "schema": "Merchant",
+      "description": "Public catalog of merchants (restaurants and grocery stores)"
+    },
+    "/menu_items/{menuItemId}": {
+      "schema": "MenuItem",
+      "description": "Public catalog of menu items and grocery goods"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders with live status tracking"
+    },
+    "/customer_addresses/{addressId}": {
+      "schema": "CustomerAddress",
+      "description": "Customer saved delivery destinations"
+    }
+  }
+}

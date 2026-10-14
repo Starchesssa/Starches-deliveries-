@@ -3,6 +3,9 @@ import { X, Plus, Minus, Check } from 'lucide-react';
 import { MenuItem, CustomizationGroup, SelectedOption, ServiceHub } from '../types';
 import { formatCurrency } from '../data/hubs';
 import { SupportedLanguage, TRANSLATIONS } from '../utils/translations';
+import { NeuCard } from './neumorphic/NeuCard';
+import { NeuButton, NeuIconButton } from './neumorphic/NeuButton';
+import { NeuInput } from './neumorphic/NeuInput';
 
 interface ItemCustomizationSheetProps {
   item: MenuItem;
@@ -29,7 +32,6 @@ export const ItemCustomizationSheet: React.FC<ItemCustomizationSheetProps> = ({
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>(() => {
-    // Pre-select default required options if any
     const initial: SelectedOption[] = [];
     if (item.customizationGroups) {
       item.customizationGroups.forEach((grp) => {
@@ -89,13 +91,11 @@ export const ItemCustomizationSheet: React.FC<ItemCustomizationSheetProps> = ({
     }
   };
 
-  // Calculate unit total with options
   const optionsExtra = selectedOptions.reduce((acc, curr) => acc + curr.price, 0);
   const unitPrice = item.price + optionsExtra;
   const totalPrice = unitPrice * quantity;
 
   const handleSubmit = () => {
-    // Validate required groups
     if (item.customizationGroups) {
       for (const group of item.customizationGroups) {
         if (group.required) {
@@ -107,7 +107,6 @@ export const ItemCustomizationSheet: React.FC<ItemCustomizationSheetProps> = ({
         }
       }
     }
-
     onAddToCart(item, quantity, selectedOptions, specialInstructions);
   };
 
@@ -127,62 +126,63 @@ export const ItemCustomizationSheet: React.FC<ItemCustomizationSheetProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="w-full max-w-lg bg-white dark:bg-[#222222] border-t sm:border border-[#E7E4DD] dark:border-[#3A3A3A] rounded-t-[24px] sm:rounded-[24px] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl transition-colors">
+      <div className="w-full max-w-lg bg-[#EEF2F9] dark:bg-[#0D1117] border-t sm:border border-[#DCE4EF] dark:border-[#1F293D] rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl transition-colors">
         {/* Header with Close */}
-        <div className="p-4 border-b border-[#E7E4DD] dark:border-[#3A3A3A] flex items-center justify-between shrink-0">
+        <div className="p-4 bg-[#F8FAFF] dark:bg-[#111722] border-b border-[#DCE4EF] dark:border-[#1F293D] flex items-center justify-between shrink-0">
           <div className="min-w-0 pr-2">
-            <span className="text-xs text-[#707070] dark:text-[#B7B7B7] font-medium block">
+            <span className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] font-medium block">
               {merchantName}
             </span>
-            <h3 className="font-bold text-base sm:text-lg text-[#242424] dark:text-white truncate">
+            <h3 className="font-extrabold text-base sm:text-lg text-[#1A202C] dark:text-[#F0F4F8] truncate">
               {displayName}
             </h3>
           </div>
-          <button
+          <NeuIconButton
+            size="sm"
+            variant="secondary"
             onClick={onClose}
             aria-label="Close"
-            className="w-10 h-10 rounded-full bg-[#F1F0EB] dark:bg-[#303030] flex items-center justify-center text-[#242424] dark:text-white hover:bg-[#E7E4DD] transition-colors shrink-0"
           >
-            <X className="w-5 h-5" />
-          </button>
+            <X className="w-4 h-4 text-[#1A202C] dark:text-[#F0F4F8]" />
+          </NeuIconButton>
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto p-4 sm:p-5 space-y-5 flex-1">
+        <div className="overflow-y-auto p-4 sm:p-5 space-y-4 flex-1">
           {/* Image & Description */}
           {item.image && (
-            <div className="h-44 w-full rounded-2xl overflow-hidden bg-[#F1F0EB] dark:bg-[#303030]">
+            <NeuCard elevation="flat" className="h-44 w-full overflow-hidden">
               <img
                 src={item.image}
                 alt={item.name}
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
               />
-            </div>
+            </NeuCard>
           )}
 
           <div>
             <div className="flex items-baseline justify-between gap-2">
-              <h4 className="font-bold text-lg text-[#242424] dark:text-white">
+              <h4 className="font-extrabold text-lg text-[#1A202C] dark:text-[#F0F4F8]">
                 {displayName}
               </h4>
-              <span className="font-mono tabular-nums text-base font-bold text-[#FF8A00]">
+              <span className="font-mono tabular-nums text-base font-extrabold text-[#FF5A1F]">
                 {formatCurrency(item.price, activeHub.currency)}
               </span>
             </div>
             {item.unitSize && (
-              <span className="text-xs text-[#707070] dark:text-[#B7B7B7]">
+              <span className="text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
                 Unit: {item.unitSize}
               </span>
             )}
-            <p className="text-sm text-[#707070] dark:text-[#B7B7B7] mt-1.5 leading-relaxed">
+            <p className="text-sm text-[#5A6A80] dark:text-[#8B9BB4] mt-1.5 leading-relaxed">
               {displayDesc}
             </p>
           </div>
 
           {/* Validation Warning */}
           {validationError && (
-            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs font-medium">
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 text-xs font-semibold">
               {validationError}
             </div>
           )}
@@ -197,20 +197,21 @@ export const ItemCustomizationSheet: React.FC<ItemCustomizationSheetProps> = ({
                 : group.name;
 
             return (
-              <div
+              <NeuCard
                 key={group.id}
-                className="p-3.5 rounded-2xl bg-[#F8F7F3] dark:bg-[#171717] border border-[#E7E4DD] dark:border-[#3A3A3A] space-y-2.5"
+                elevation="flat"
+                className="p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-[#242424] dark:text-white">
+                  <span className="font-bold text-sm text-[#1A202C] dark:text-[#F0F4F8]">
                     {groupTitle}
                   </span>
-                  <span className="text-[11px] font-semibold text-[#707070] dark:text-[#B7B7B7]">
+                  <span className="text-[11px] font-semibold text-[#5A6A80] dark:text-[#8B9BB4]">
                     {group.required ? 'Required (Lazima)' : 'Optional'}
                   </span>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {group.options.map((opt) => {
                     const isSelected = selectedOptions.some(
                       (o) => o.optionId === opt.id
@@ -227,27 +228,27 @@ export const ItemCustomizationSheet: React.FC<ItemCustomizationSheetProps> = ({
                         key={opt.id}
                         type="button"
                         onClick={() => handleToggleOption(group, opt)}
-                        className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-xs sm:text-sm transition-all min-h-[44px] ${
+                        className={`w-full flex items-center justify-between p-3 rounded-xl text-xs sm:text-sm transition-all min-h-[44px] cursor-pointer ${
                           isSelected
-                            ? 'bg-white dark:bg-[#222222] border-[#FF8A00] text-[#242424] dark:text-white font-semibold shadow-xs'
-                            : 'bg-transparent border-[#E7E4DD] dark:border-[#3A3A3A] text-[#707070] dark:text-[#B7B7B7]'
+                            ? 'neu-pressed border border-[#FF5A1F] text-[#1A202C] dark:text-[#F0F4F8] font-bold'
+                            : 'neu-button text-[#5A6A80] dark:text-[#8B9BB4]'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5">
                           <div
-                            className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                            className={`w-4.5 h-4.5 rounded-full flex items-center justify-center ${
                               isSelected
-                                ? 'border-[#FF8A00] bg-[#FF8A00] text-white'
-                                : 'border-[#909090]'
+                                ? 'bg-[#FF5A1F] text-white shadow-xs'
+                                : 'neu-pressed border border-[#DCE4EF] dark:border-[#1F293D]'
                             }`}
                           >
-                            {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                           </div>
                           <span>{optName}</span>
                         </div>
 
                         {opt.price > 0 && (
-                          <span className="font-mono tabular-nums text-[#FF8A00]">
+                          <span className="font-mono tabular-nums text-[#FF5A1F] font-bold">
                             +{formatCurrency(opt.price, activeHub.currency)}
                           </span>
                         )}
@@ -255,61 +256,66 @@ export const ItemCustomizationSheet: React.FC<ItemCustomizationSheetProps> = ({
                     );
                   })}
                 </div>
-              </div>
+              </NeuCard>
             );
           })}
 
           {/* Special Instructions Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#707070] dark:text-[#B7B7B7]">
+            <label className="text-xs font-semibold text-[#5A6A80] dark:text-[#8B9BB4] block">
               Special Instructions (Notes)
             </label>
-            <input
+            <NeuInput
               type="text"
               value={specialInstructions}
               onChange={(e) => setSpecialInstructions(e.target.value)}
               placeholder="e.g. Less salt, extra lime, packing separately..."
-              className="w-full h-11 px-3 text-sm rounded-xl bg-[#F8F7F3] dark:bg-[#171717] border border-[#E7E4DD] dark:border-[#3A3A3A] text-[#242424] dark:text-white outline-none focus:border-[#FF8A00]"
             />
           </div>
         </div>
 
-        {/* Bottom Sticky Action Bar: Quantity & Full-Width 52px Add Button */}
-        <div className="p-4 border-t border-[#E7E4DD] dark:border-[#3A3A3A] bg-white dark:bg-[#222222] shrink-0 space-y-3">
+        {/* Bottom Sticky Action Bar */}
+        <div className="p-4 border-t border-[#DCE4EF] dark:border-[#1F293D] bg-[#F8FAFF] dark:bg-[#111722] shrink-0 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#707070] dark:text-[#B7B7B7]">
+            <span className="text-xs font-semibold text-[#5A6A80] dark:text-[#8B9BB4]">
               Quantity
             </span>
-            <div className="flex items-center gap-3 bg-[#F1F0EB] dark:bg-[#303030] p-1 rounded-xl">
+            <div className="flex items-center gap-1.5 neu-pressed p-1 rounded-xl">
               <button
+                type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 aria-label="Decrease quantity"
-                className="w-8 h-8 rounded-lg bg-white dark:bg-[#222222] flex items-center justify-center text-[#242424] dark:text-white shadow-xs active:scale-95 transition-transform"
+                className="w-8 h-8 rounded-lg neu-button flex items-center justify-center text-[#1A202C] dark:text-[#F0F4F8] cursor-pointer"
               >
                 <Minus className="w-4 h-4" />
               </button>
-              <span className="w-6 text-center font-bold font-mono tabular-nums text-sm text-[#242424] dark:text-white">
+              <span className="w-7 text-center font-bold font-mono tabular-nums text-sm text-[#1A202C] dark:text-[#F0F4F8]">
                 {quantity}
               </span>
               <button
+                type="button"
                 onClick={() => setQuantity((q) => q + 1)}
                 aria-label="Increase quantity"
-                className="w-8 h-8 rounded-lg bg-white dark:bg-[#222222] flex items-center justify-center text-[#242424] dark:text-white shadow-xs active:scale-95 transition-transform"
+                className="w-8 h-8 rounded-lg neu-button flex items-center justify-center text-[#1A202C] dark:text-[#F0F4F8] cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <button
+          <NeuButton
+            variant="primary"
+            size="lg"
+            fullWidth
             onClick={handleSubmit}
-            className="w-full h-[52px] rounded-xl bg-[#FF8A00] hover:bg-[#E87900] active:scale-[0.99] text-white font-semibold text-base flex items-center justify-between px-5 shadow-md transition-all"
           >
-            <span>{t.add_to_cart}</span>
-            <span className="font-mono tabular-nums">
-              {formatCurrency(totalPrice, activeHub.currency)}
+            <span className="flex items-center justify-between w-full">
+              <span>{t.add_to_cart}</span>
+              <span className="font-mono tabular-nums font-extrabold">
+                {formatCurrency(totalPrice, activeHub.currency)}
+              </span>
             </span>
-          </button>
+          </NeuButton>
         </div>
       </div>
     </div>

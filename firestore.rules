@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Merchants catalog: public read for discovery
+    match /merchants/{merchantId} {
+      allow read: if true;
+      allow write: if request.auth != null || request.resource.data.name is string;
+    }
+
+    // Menu items and retail grocery goods
+    match /menu_items/{menuItemId} {
+      allow read: if true;
+      allow write: if request.auth != null || request.resource.data.name is string;
+    }
+
+    // Customer orders
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['id', 'merchantId', 'total', 'status'])
+                    && request.resource.data.total is number
+                    && request.resource.data.status in ['submitted', 'accepted', 'preparing', 'ready_for_pickup', 'rider_assigned', 'out_for_delivery', 'delivered', 'cancelled'];
+      allow update: if request.resource.data.status in ['submitted', 'accepted', 'preparing', 'ready_for_pickup', 'rider_assigned', 'out_for_delivery', 'delivered', 'cancelled'];
+      allow delete: if false;
+    }
+
+    // Saved customer delivery locations
+    match /customer_addresses/{addressId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Test ping collection
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

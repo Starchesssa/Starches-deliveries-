@@ -405,7 +405,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   </div>
                   <div>
                     <div className="text-sm font-semibold">Light theme</div>
-                    <div className="text-xs text-[var(--text-secondary)]">Warm white primary background</div>
+                    <div className="text-xs text-[var(--text-secondary)]">Icy white (#EEF2F9) background</div>
                   </div>
                 </div>
                 {selectedTheme === 'light' && (
@@ -435,7 +435,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   </div>
                   <div>
                     <div className="text-sm font-semibold">Dark theme</div>
-                    <div className="text-xs text-[var(--text-secondary)]">Deep charcoal appearance</div>
+                    <div className="text-xs text-[var(--text-secondary)]">Premium black (#0D1117) background</div>
                   </div>
                 </div>
                 {selectedTheme === 'dark' && (

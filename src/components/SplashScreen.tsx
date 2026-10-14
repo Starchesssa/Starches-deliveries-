@@ -48,7 +48,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
       style={{
-        backgroundColor: '#FCFAED',
+        backgroundColor: '#EEF2F9',
         width: '100vw',
         height: '100dvh',
       }}
@@ -60,7 +60,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         referrerPolicy="no-referrer"
         className="w-full h-full object-contain pointer-events-none animate-in zoom-in-95 fade-in duration-500"
         style={{
-          backgroundColor: '#FCFAED',
+          backgroundColor: '#EEF2F9',
           maxHeight: '100dvh',
           maxWidth: '100vw',
         }}

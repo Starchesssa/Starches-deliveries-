@@ -11,11 +11,16 @@ import {
   Sparkles,
   MapPin,
   Zap,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { Merchant, ServiceHub } from '../types';
 import { CATEGORIES_BY_HUB } from '../data/merchants';
 import { formatCurrency } from '../data/hubs';
 import { SupportedLanguage, TRANSLATIONS } from '../utils/translations';
+import { NeuCard } from './neumorphic/NeuCard';
+import { NeuButton, NeuIconButton } from './neumorphic/NeuButton';
+import { NeuInput } from './neumorphic/NeuInput';
 
 export type MainFeedTab = 'all' | 'restaurants' | 'groceries';
 
@@ -28,6 +33,9 @@ interface HomeFeedProps {
   onSelectMerchant: (merchant: Merchant) => void;
   onToggleMapView?: () => void;
   isMapViewActive?: boolean;
+  isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export const HomeFeed: React.FC<HomeFeedProps> = ({
@@ -39,6 +47,9 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
   onSelectMerchant,
   onToggleMapView,
   isMapViewActive,
+  isLoading = false,
+  error = null,
+  onRetry,
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
 
@@ -108,7 +119,6 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
     ];
   }, [mainTab, hubCategories, language, t]);
 
-  // When switching main tabs, reset subTab to 'all'
   const handleMainTabChange = (tab: MainFeedTab) => {
     setMainTab(tab);
     setSubTab('all');
@@ -127,13 +137,28 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
       // 3. Sub-tab filter
       if (subTab === 'top_rated' && m.rating < 4.8) return false;
       if (subTab === 'fast' && m.deliveryTimeMinutes > 25) return false;
-      if (subTab === 'fresh' && !m.tags.includes('groceries') && !m.cuisine.toLowerCase().includes('produce') && !m.cuisine.toLowerCase().includes('matunda')) {
+      if (
+        subTab === 'fresh' &&
+        !m.tags.includes('groceries') &&
+        !m.cuisine.toLowerCase().includes('produce') &&
+        !m.cuisine.toLowerCase().includes('matunda')
+      ) {
         return false;
       }
-      if (subTab === 'supermarket' && !m.name.toLowerCase().includes('supermarket') && !m.cuisine.toLowerCase().includes('supermarket') && !m.tags.includes('supermarket')) {
+      if (
+        subTab === 'supermarket' &&
+        !m.name.toLowerCase().includes('supermarket') &&
+        !m.cuisine.toLowerCase().includes('supermarket') &&
+        !m.tags.includes('supermarket')
+      ) {
         return false;
       }
-      if (subTab === 'bakery_dairy' && !m.tags.includes('bakery') && !m.tags.includes('breakfast') && !m.cuisine.toLowerCase().includes('bakery')) {
+      if (
+        subTab === 'bakery_dairy' &&
+        !m.tags.includes('bakery') &&
+        !m.tags.includes('breakfast') &&
+        !m.cuisine.toLowerCase().includes('bakery')
+      ) {
         return false;
       }
       if (
@@ -173,39 +198,38 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
 
   return (
     <div className="w-full pb-28">
-      {/* Search Bar - Clean, 50px height, #F8FAFF in light theme */}
+      {/* Search Bar with Neumorphic Inset Shadow */}
       <div className="px-4 pt-3 pb-2">
-        <div className="relative flex items-center h-[50px] bg-[#F8FAFF] dark:bg-[#111722] border border-[#DCE4EF] dark:border-[#1F293D] rounded-xl px-3.5 shadow-xs transition-colors">
-          <Search className="w-5 h-5 text-[#8492A6] mr-2.5 shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.search_placeholder}
-            className="w-full bg-transparent text-[15px] outline-none text-[#1A202C] dark:text-[#F0F4F8] placeholder-[#8492A6]"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="text-xs text-[#8492A6] hover:text-[#1A202C] dark:hover:text-[#F0F4F8] px-1 cursor-pointer"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+        <NeuInput
+          prefixIcon={<Search className="w-4.5 h-4.5" />}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t.search_placeholder}
+          suffixIcon={
+            searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="text-xs text-[#5A6A80] hover:text-[#1A202C] dark:hover:text-[#F0F4F8] p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            ) : null
+          }
+        />
       </div>
 
-      {/* 1. THREE MAIN TABS: All Tab, Restaurant Tab, Groceries Tab */}
-      <div className="px-4 pt-1 pb-2">
-        <div className="p-1 rounded-2xl bg-[#E5ECF6] dark:bg-[#171F2E] border border-[#DCE4EF] dark:border-[#1F293D] grid grid-cols-3 gap-1">
+      {/* 1. THREE MAIN TABS: All Tab, Restaurant Tab, Groceries Tab (Tactile Neumorphic) */}
+      <div className="px-4 pt-1.5 pb-2">
+        <div className="p-1.5 rounded-2xl neu-pressed grid grid-cols-3 gap-1.5">
           {/* Main Tab 1: All */}
           <button
             type="button"
             onClick={() => handleMainTabChange('all')}
             className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all min-h-[44px] cursor-pointer ${
               mainTab === 'all'
-                ? 'bg-[#FF5A1F] text-white shadow-xs'
-                : 'text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8] hover:bg-[#F8FAFF]/60 dark:hover:bg-[#111722]/60'
+                ? 'neu-button-primary'
+                : 'text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8]'
             }`}
           >
             <Sparkles className="w-4 h-4 shrink-0" />
@@ -218,8 +242,8 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
             onClick={() => handleMainTabChange('restaurants')}
             className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all min-h-[44px] cursor-pointer ${
               mainTab === 'restaurants'
-                ? 'bg-[#FF5A1F] text-white shadow-xs'
-                : 'text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8] hover:bg-[#F8FAFF]/60 dark:hover:bg-[#111722]/60'
+                ? 'neu-button-primary'
+                : 'text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8]'
             }`}
           >
             <UtensilsCrossed className="w-4 h-4 shrink-0" />
@@ -232,8 +256,8 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
             onClick={() => handleMainTabChange('groceries')}
             className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all min-h-[44px] cursor-pointer ${
               mainTab === 'groceries'
-                ? 'bg-[#FF5A1F] text-white shadow-xs'
-                : 'text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8] hover:bg-[#F8FAFF]/60 dark:hover:bg-[#111722]/60'
+                ? 'neu-button-primary'
+                : 'text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8]'
             }`}
           >
             <Store className="w-4 h-4 shrink-0" />
@@ -243,7 +267,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
       </div>
 
       {/* 2. SUB-TABS ROW BELOW EACH TAB (ie near me, top rated, fast delivery, cuisines) */}
-      <div className="px-4 py-1.5 flex items-center justify-between gap-2">
+      <div className="px-4 py-1.5 flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 flex-1">
           {subTabs.map((st) => {
             const isSelected = subTab === st.id;
@@ -254,8 +278,8 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                 onClick={() => setSubTab(st.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all min-h-[38px] cursor-pointer ${
                   isSelected
-                    ? 'bg-[#FF5A1F] text-white border border-[#FF5A1F] shadow-xs'
-                    : 'bg-[#F8FAFF] dark:bg-[#111722] text-[#5A6A80] dark:text-[#8B9BB4] border border-[#DCE4EF] dark:border-[#1F293D] hover:border-[#FF5A1F] hover:text-[#1A202C] dark:hover:text-[#F0F4F8]'
+                    ? 'neu-button-primary'
+                    : 'neu-button text-[#5A6A80] dark:text-[#8B9BB4] hover:text-[#1A202C] dark:hover:text-[#F0F4F8]'
                 }`}
               >
                 {st.icon}
@@ -267,26 +291,43 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
 
         {/* Map View Toggle Button */}
         {onToggleMapView && (
-          <button
-            type="button"
+          <NeuIconButton
+            variant={isMapViewActive ? 'primary' : 'secondary'}
+            size="md"
             onClick={onToggleMapView}
-            className={`p-2.5 rounded-xl border transition-colors shrink-0 shadow-xs cursor-pointer ${
-              isMapViewActive
-                ? 'bg-[#FF5A1F] text-white border-[#FF5A1F]'
-                : 'bg-[#F8FAFF] dark:bg-[#111722] text-[#5A6A80] dark:text-[#8B9BB4] border border-[#DCE4EF] dark:border-[#1F293D] hover:border-[#FF5A1F] hover:text-[#1A202C] dark:hover:text-[#F0F4F8]'
-            }`}
             title="Toggle Map View"
             aria-label="Toggle Map View"
           >
             <MapIcon className="w-4 h-4" />
-          </button>
+          </NeuIconButton>
         )}
       </div>
 
       {/* 3. Merchant Cards Feed */}
       <div className="px-4 pt-2.5 space-y-4">
-        {filteredMerchants.length === 0 ? (
-          <div className="py-16 text-center bg-[#F8FAFF] dark:bg-[#111722] rounded-2xl border border-[#DCE4EF] dark:border-[#1F293D] p-6 shadow-xs">
+        {isLoading ? (
+          <div className="py-20 text-center flex flex-col items-center justify-center">
+            <Loader2 className="w-8 h-8 text-[#FF5A1F] animate-spin mb-3" />
+            <p className="text-sm font-medium text-[#5A6A80] dark:text-[#8B9BB4]">
+              Connecting to Starches live catalog...
+            </p>
+          </div>
+        ) : error ? (
+          <NeuCard elevation="flat" className="p-6 text-center my-4">
+            <p className="text-sm text-red-500 mb-3">{error}</p>
+            {onRetry && (
+              <NeuButton
+                variant="primary"
+                size="sm"
+                onClick={onRetry}
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Retry
+              </NeuButton>
+            )}
+          </NeuCard>
+        ) : filteredMerchants.length === 0 ? (
+          <NeuCard elevation="flat" className="py-16 text-center p-6 my-4">
             <UtensilsCrossed className="w-10 h-10 text-[#8492A6] mx-auto mb-2.5" />
             <h3 className="font-bold text-base text-[#1A202C] dark:text-[#F0F4F8]">
               No merchants found
@@ -298,18 +339,20 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                 ? 'No grocery stores match your selected filter. Try another tab or clear search.'
                 : 'Try adjusting your sub-tab filter or search query.'}
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                setMainTab('all');
-                setSubTab('all');
-                setSearchQuery('');
-              }}
-              className="mt-4 px-4 py-2 rounded-xl bg-[#FF5A1F] text-white text-xs font-semibold shadow-xs hover:bg-[#E84D15] cursor-pointer"
-            >
-              Show All Available
-            </button>
-          </div>
+            <div className="mt-4 flex justify-center">
+              <NeuButton
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setMainTab('all');
+                  setSubTab('all');
+                  setSearchQuery('');
+                }}
+              >
+                Show All Available
+              </NeuButton>
+            </div>
+          </NeuCard>
         ) : (
           filteredMerchants.map((merchant) => {
             const isFav = favorites.includes(merchant.id);
@@ -321,19 +364,21 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                 : merchant.cuisine;
 
             return (
-              <div
+              <NeuCard
                 key={merchant.id}
+                elevation="flat"
+                clickable
                 onClick={() => onSelectMerchant(merchant)}
-                className="bg-[#F8FAFF] dark:bg-[#111722] border border-[#DCE4EF] dark:border-[#1F293D] rounded-2xl overflow-hidden shadow-xs hover:border-[#FF5A1F]/60 active:scale-[0.99] transition-all cursor-pointer group"
+                className="overflow-hidden group"
               >
                 {/* Hero Image */}
-                <div className="relative h-32 w-full bg-[#E5ECF6] dark:bg-[#171F2E] overflow-hidden">
+                <div className="relative h-34 w-full bg-[#E5ECF6] dark:bg-[#171F2E] overflow-hidden">
                   <img
                     src={merchant.image}
                     alt={merchant.name}
                     loading="lazy"
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-300"
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
@@ -342,15 +387,15 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
 
                   {/* Merchant Type indicator */}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F8FAFF]/95 dark:bg-[#111722]/95 border border-[#DCE4EF]/80 dark:border-[#1F293D] text-[#1A202C] dark:text-[#F0F4F8] backdrop-blur-md text-[11px] font-semibold shadow-xs">
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1 rounded-xl neu-glass text-[#1A202C] dark:text-[#F0F4F8] text-[11px] font-semibold border border-white/60 dark:border-[#232F44]/70">
                     {merchant.type === 'grocery' ? (
                       <>
-                        <Store className="w-3 h-3 text-[#FF5A1F]" />
+                        <Store className="w-3.5 h-3.5 text-[#FF5A1F]" />
                         <span>Food Grocery</span>
                       </>
                     ) : (
                       <>
-                        <UtensilsCrossed className="w-3 h-3 text-[#FF5A1F]" />
+                        <UtensilsCrossed className="w-3.5 h-3.5 text-[#FF5A1F]" />
                         <span>Restaurant</span>
                       </>
                     )}
@@ -358,72 +403,65 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
 
                   {/* Favorite Toggle Button */}
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleFavorite(merchant.id);
                     }}
-                    aria-label="Save to favorites"
-                    className="absolute top-2.5 right-2.5 w-10 h-10 rounded-full bg-[#F8FAFF]/90 dark:bg-[#111722]/90 border border-[#DCE4EF]/60 dark:border-[#1F293D] backdrop-blur-md flex items-center justify-center text-[#1A202C] dark:text-[#F0F4F8] hover:scale-110 active:scale-95 transition-all shadow-xs cursor-pointer"
+                    aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                    className="absolute top-3 right-3 w-9 h-9 rounded-xl neu-glass flex items-center justify-center border border-white/60 dark:border-[#232F44]/70 active:scale-90 transition-transform cursor-pointer"
                   >
                     <Heart
-                      className={`w-4 h-4 ${
+                      className={`w-4 h-4 transition-colors ${
                         isFav
                           ? 'fill-[#FF5A1F] text-[#FF5A1F]'
-                          : 'text-[#1A202C] dark:text-[#F0F4F8]'
+                          : 'text-white drop-shadow-sm'
                       }`}
                     />
                   </button>
+
+                  {/* Delivery time pill on image */}
+                  <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-[#FF5A1F]" />
+                    <span>{merchant.deliveryTimeMinutes} mins</span>
+                  </div>
                 </div>
 
-                {/* Card Content */}
-                <div className="p-3.5 sm:p-4">
+                {/* Content */}
+                <div className="p-3.5 space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-[15px] sm:text-base text-[#1A202C] dark:text-[#F0F4F8] leading-snug">
+                    <h3 className="font-bold text-[15px] text-[#1A202C] dark:text-[#F0F4F8] group-hover:text-[#FF5A1F] transition-colors line-clamp-1">
                       {merchant.name}
                     </h3>
-                  </div>
-
-                  {/* Cuisine / Secondary line */}
-                  <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] mt-0.5 line-clamp-1">
-                    {cuisineLabel}
-                  </p>
-
-                  {/* Metadata: Clean text separated by · with subtle styling */}
-                  <div className="flex items-center gap-2 mt-2.5 text-xs text-[#5A6A80] dark:text-[#8B9BB4] font-medium">
-                    <div className="flex items-center gap-1 text-[#1A202C] dark:text-[#F0F4F8] font-semibold">
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg neu-pressed shrink-0">
                       <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <span>{merchant.rating}</span>
-                      <span className="text-[#8492A6] font-normal">
+                      <span className="text-xs font-bold text-[#1A202C] dark:text-[#F0F4F8]">
+                        {merchant.rating}
+                      </span>
+                      <span className="text-[10px] text-[#5A6A80] dark:text-[#8B9BB4]">
                         ({merchant.ratingCount})
                       </span>
                     </div>
+                  </div>
 
-                    <span aria-hidden="true" className="text-[#8492A6]">
-                      ·
-                    </span>
+                  <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] line-clamp-1">
+                    {cuisineLabel}
+                  </p>
 
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-[#8492A6]" />
+                  <div className="pt-2 border-t border-[#DCE4EF]/60 dark:border-[#1F293D]/60 flex items-center justify-between text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <Bike className="w-3.5 h-3.5 text-[#FF5A1F]" />
                       <span>
-                        {merchant.deliveryTimeMinutes} {t.delivery_time}
+                        {formatCurrency(merchant.deliveryFee, activeHub.currency)} delivery
                       </span>
                     </div>
 
-                    <span aria-hidden="true" className="text-[#8492A6]">
-                      ·
+                    <span className="text-[11px] truncate max-w-[140px]">
+                      {merchant.address}
                     </span>
-
-                    <div className="flex items-center gap-1 font-mono tabular-nums">
-                      <Bike className="w-3.5 h-3.5 text-[#8492A6]" />
-                      <span>
-                        {merchant.deliveryFee === 0
-                          ? t.free_delivery
-                          : formatCurrency(merchant.deliveryFee, activeHub.currency)}
-                      </span>
-                    </div>
                   </div>
                 </div>
-              </div>
+              </NeuCard>
             );
           })
         )}

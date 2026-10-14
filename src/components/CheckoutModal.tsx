@@ -20,6 +20,10 @@ import {
 } from '../types';
 import { formatCurrency } from '../data/hubs';
 import { SupportedLanguage, TRANSLATIONS } from '../utils/translations';
+import { createOrderInFirestore } from '../services/firebase';
+import { NeuCard } from './neumorphic/NeuCard';
+import { NeuButton, NeuIconButton } from './neumorphic/NeuButton';
+import { NeuInput } from './neumorphic/NeuInput';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -78,57 +82,60 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    // If mobile money is chosen, simulate the USSD push notification first
     if (['mpesa', 'airtel_money', 'tigopesa', 'mtn_money'].includes(paymentMethod)) {
       setShowUssdPrompt(true);
       return;
     }
 
-    // COD or Card
     completeOrderSubmission('pending');
   };
 
-  const completeOrderSubmission = (paymentStatus: 'pending' | 'authorized' | 'paid') => {
+  const completeOrderSubmission = async (paymentStatus: 'pending' | 'authorized' | 'paid') => {
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const orderRef = `STA-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newOrder: Order = {
-        id: `ord-${Date.now()}`,
-        referenceNumber: orderRef,
-        merchantId,
-        merchantName,
-        merchantType: 'restaurant',
-        hubId: activeHub.id,
-        currency: activeHub.currency,
-        items: [...cartItems],
-        subtotal,
-        deliveryFee,
-        serviceFee,
-        total,
-        paymentMethod,
-        paymentStatus,
-        status: 'submitted',
-        createdAt: new Date().toISOString(),
-        deliveryLocation: {
-          ...deliveryLocation,
-          deliveryNotes,
-        },
-        recipientPhone: phoneNumber,
-        rider: {
-          name: 'Juma Bakari',
-          phone: '+255 712 998 877',
-          vehicle: 'TVS Star HLX (Box T 412 DKS)',
-          currentLat: deliveryLocation.lat - 0.005,
-          currentLng: deliveryLocation.lng - 0.005,
-        },
-        estimatedDeliveryMinutes: 28,
-      };
+    const orderRef = `STA-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newOrder: Order = {
+      id: `ord-${Date.now()}`,
+      referenceNumber: orderRef,
+      merchantId,
+      merchantName,
+      merchantType: 'restaurant',
+      hubId: activeHub.id,
+      currency: activeHub.currency,
+      items: [...cartItems],
+      subtotal,
+      deliveryFee,
+      serviceFee,
+      total,
+      paymentMethod,
+      paymentStatus,
+      status: 'submitted',
+      createdAt: new Date().toISOString(),
+      deliveryLocation: {
+        ...deliveryLocation,
+        deliveryNotes,
+      },
+      recipientPhone: phoneNumber,
+      rider: {
+        name: 'Juma Bakari',
+        phone: '+255 712 998 877',
+        vehicle: 'TVS Star HLX (Box T 412 DKS)',
+        currentLat: deliveryLocation.lat - 0.005,
+        currentLng: deliveryLocation.lng - 0.005,
+      },
+      estimatedDeliveryMinutes: 28,
+    };
 
-      setIsSubmitting(false);
-      setShowUssdPrompt(false);
-      onPlaceOrder(newOrder);
-    }, 1200);
+    // Save order in Firestore!
+    try {
+      await createOrderInFirestore(newOrder);
+    } catch (err) {
+      console.warn('Notice saving order to Firestore:', err);
+    }
+
+    setIsSubmitting(false);
+    setShowUssdPrompt(false);
+    onPlaceOrder(newOrder);
   };
 
   const handleConfirmUssd = (e: React.FormEvent) => {
@@ -143,417 +150,326 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-lg bg-white dark:bg-[#222222] border-t sm:border border-[#E7E4DD] dark:border-[#3A3A3A] rounded-t-[24px] sm:rounded-[24px] max-h-[92vh] flex flex-col overflow-hidden shadow-2xl transition-colors">
+      <div className="w-full max-w-lg bg-[#EEF2F9] dark:bg-[#0D1117] border-t sm:border border-[#DCE4EF] dark:border-[#1F293D] rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl transition-colors">
         {/* Header */}
-        <div className="p-4 border-b border-[#E7E4DD] dark:border-[#3A3A3A] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <button
+        <div className="p-4 bg-[#F8FAFF] dark:bg-[#111722] border-b border-[#DCE4EF] dark:border-[#1F293D] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <NeuIconButton
+              size="sm"
+              variant="secondary"
               onClick={onClose}
-              className="p-1 rounded-lg text-[#707070] dark:text-[#B7B7B7] hover:bg-[#F1F0EB]"
+              aria-label="Back"
             >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h3 className="font-bold text-base sm:text-lg text-[#242424] dark:text-white">
+              <ArrowLeft className="w-4 h-4 text-[#1A202C] dark:text-[#F0F4F8]" />
+            </NeuIconButton>
+            <h3 className="font-extrabold text-base sm:text-lg text-[#1A202C] dark:text-[#F0F4F8]">
               {t.checkout}
             </h3>
           </div>
-          <button
+          <NeuIconButton
+            size="sm"
+            variant="secondary"
             onClick={onClose}
             aria-label="Close checkout"
-            className="w-8 h-8 rounded-full bg-[#F1F0EB] dark:bg-[#303030] flex items-center justify-center text-[#242424] dark:text-white"
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X className="w-4 h-4 text-[#1A202C] dark:text-[#F0F4F8]" />
+          </NeuIconButton>
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="overflow-y-auto p-4 sm:p-5 space-y-5 flex-1">
+        <div className="overflow-y-auto p-4 sm:p-5 space-y-4 flex-1">
           {/* Section 1: Delivery Address */}
-          <div className="p-3.5 rounded-2xl bg-[#F8F7F3] dark:bg-[#171717] border border-[#E7E4DD] dark:border-[#3A3A3A]">
+          <NeuCard elevation="flat" className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[#707070] dark:text-[#B7B7B7] flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-[#FF8A00]" />
+              <span className="text-xs font-semibold text-[#5A6A80] dark:text-[#8B9BB4] flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#FF5A1F]" />
                 <span>Delivery Address</span>
               </span>
               <button
+                type="button"
                 onClick={onEditAddress}
-                className="text-xs font-semibold text-[#FF8A00] hover:underline"
+                className="text-xs font-bold text-[#FF5A1F] hover:underline cursor-pointer"
               >
                 Change
               </button>
             </div>
-            <div className="font-semibold text-sm text-[#242424] dark:text-white">
+            <div className="font-bold text-sm text-[#1A202C] dark:text-[#F0F4F8]">
               {deliveryLocation.address}
             </div>
-            <div className="text-xs text-[#707070] dark:text-[#B7B7B7] mt-0.5">
+            <div className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] mt-0.5">
               {deliveryLocation.city}, {deliveryLocation.country}
             </div>
-          </div>
+          </NeuCard>
 
           {/* Section 2: Order Items Summary */}
-          <div className="p-3.5 rounded-2xl bg-[#F8F7F3] dark:bg-[#171717] border border-[#E7E4DD] dark:border-[#3A3A3A]">
-            <div className="text-xs font-semibold text-[#707070] dark:text-[#B7B7B7] mb-2">
-              Ordering from: <span className="text-[#242424] dark:text-white font-bold">{merchantName}</span>
+          <NeuCard elevation="flat" className="p-4">
+            <div className="text-xs font-semibold text-[#5A6A80] dark:text-[#8B9BB4] mb-2.5">
+              Ordering from: <span className="text-[#1A202C] dark:text-[#F0F4F8] font-bold">{merchantName}</span>
             </div>
-            <div className="space-y-1.5 divide-y divide-[#E7E4DD] dark:divide-[#3A3A3A]">
+            <div className="space-y-2 divide-y divide-[#DCE4EF]/60 dark:divide-[#1F293D]/60">
               {cartItems.map((item) => (
-                <div key={item.id} className="pt-1.5 flex justify-between text-xs">
-                  <span className="text-[#242424] dark:text-white">
+                <div key={item.id} className="pt-2 flex justify-between text-xs">
+                  <span className="text-[#1A202C] dark:text-[#F0F4F8] font-medium">
                     {item.quantity}x {item.name}
                   </span>
-                  <span className="font-mono tabular-nums text-[#707070] dark:text-[#B7B7B7]">
+                  <span className="font-mono tabular-nums text-[#5A6A80] dark:text-[#8B9BB4] font-semibold">
                     {formatCurrency(item.totalPrice, activeHub.currency)}
                   </span>
                 </div>
               ))}
             </div>
-          </div>
+          </NeuCard>
 
           {/* Section 3: Delivery Instructions */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#707070] dark:text-[#B7B7B7]">
+            <label className="text-xs font-semibold text-[#5A6A80] dark:text-[#8B9BB4] block">
               {t.delivery_instructions}
             </label>
-            <input
+            <NeuInput
               type="text"
               value={deliveryNotes}
               onChange={(e) => setDeliveryNotes(e.target.value)}
               placeholder={t.delivery_notes_placeholder}
-              className="w-full h-11 px-3 text-sm rounded-xl bg-[#F8F7F3] dark:bg-[#171717] border border-[#E7E4DD] dark:border-[#3A3A3A] text-[#242424] dark:text-white outline-none focus:border-[#FF8A00]"
             />
           </div>
 
           {/* Section 4: Phone Number */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#707070] dark:text-[#B7B7B7]">
+            <label className="text-xs font-semibold text-[#5A6A80] dark:text-[#8B9BB4] block">
               {t.phone_number_label}
             </label>
-            <input
+            <NeuInput
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder={t.phone_placeholder}
-              className="w-full h-11 px-3 text-sm rounded-xl bg-[#F8F7F3] dark:bg-[#171717] border border-[#E7E4DD] dark:border-[#3A3A3A] text-[#242424] dark:text-white outline-none focus:border-[#FF8A00] font-mono tabular-nums"
+              className="font-mono tabular-nums"
               required
             />
           </div>
 
           {/* Section 5: Payment Methods Selection */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-[#707070] dark:text-[#B7B7B7] block">
+            <label className="text-xs font-semibold text-[#5A6A80] dark:text-[#8B9BB4] block">
               {t.payment_method}
             </label>
 
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {/* Cash on Delivery */}
               {activeHub.supportedPayments.includes('cod') && (
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('cod')}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-all cursor-pointer ${
                     paymentMethod === 'cod'
-                      ? 'border-[#FF8A00] bg-[#FF8A00]/5 dark:bg-[#FF8A00]/10 shadow-xs'
-                      : 'border-[#E7E4DD] dark:border-[#3A3A3A] bg-[#F8F7F3] dark:bg-[#171717]'
+                      ? 'neu-pressed border border-[#FF5A1F]'
+                      : 'neu-button text-[#1A202C] dark:text-[#F0F4F8]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
                       <Banknote className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-[#242424] dark:text-white">
-                        {t.cash_on_delivery}
-                      </div>
-                      <div className="text-xs text-[#707070] dark:text-[#B7B7B7]">
-                        {t.cash_on_delivery_desc}
-                      </div>
+                      <p className="text-sm font-bold text-[#1A202C] dark:text-[#F0F4F8]">
+                        Cash on Delivery
+                      </p>
+                      <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+                        Pay driver cash upon arrival
+                      </p>
                     </div>
                   </div>
-                  <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                      paymentMethod === 'cod'
-                        ? 'border-[#FF8A00] bg-[#FF8A00] text-white'
-                        : 'border-[#909090]'
-                    }`}
-                  >
-                    {paymentMethod === 'cod' && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </div>
+                  {paymentMethod === 'cod' && (
+                    <CheckCircle2 className="w-5 h-5 text-[#FF5A1F]" />
+                  )}
                 </button>
               )}
 
-              {/* Vodacom M-Pesa (Tanzania) */}
-              {activeHub.supportedPayments.includes('mpesa') && (
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('mpesa')}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                    paymentMethod === 'mpesa'
-                      ? 'border-[#FF8A00] bg-[#FF8A00]/5 dark:bg-[#FF8A00]/10 shadow-xs'
-                      : 'border-[#E7E4DD] dark:border-[#3A3A3A] bg-[#F8F7F3] dark:bg-[#171717]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-950/60 flex items-center justify-center text-red-600 shrink-0 font-bold text-xs">
-                      M
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-[#242424] dark:text-white">
-                        {t.mpesa_label}
-                      </div>
-                      <div className="text-xs text-[#707070] dark:text-[#B7B7B7]">
-                        Vodacom USSD push payment
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                      paymentMethod === 'mpesa'
-                        ? 'border-[#FF8A00] bg-[#FF8A00] text-white'
-                        : 'border-[#909090]'
+              {/* Mobile Money Options */}
+              {['mpesa', 'airtel_money', 'tigopesa', 'mtn_money'].map((method) => {
+                if (!activeHub.supportedPayments.includes(method as PaymentMethodType)) {
+                  return null;
+                }
+                const label =
+                  method === 'mpesa'
+                    ? 'M-Pesa (Vodacom)'
+                    : method === 'airtel_money'
+                    ? 'Airtel Money'
+                    : method === 'tigopesa'
+                    ? 'Tigo Pesa (Mixx)'
+                    : 'MTN Mobile Money';
+
+                return (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setPaymentMethod(method as PaymentMethodType)}
+                    className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-all cursor-pointer ${
+                      paymentMethod === method
+                        ? 'neu-pressed border border-[#FF5A1F]'
+                        : 'neu-button text-[#1A202C] dark:text-[#F0F4F8]'
                     }`}
                   >
-                    {paymentMethod === 'mpesa' && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#FF5A1F]/15 flex items-center justify-center text-[#FF5A1F] shrink-0">
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-[#1A202C] dark:text-[#F0F4F8]">
+                          {label}
+                        </p>
+                        <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+                          Instant USSD PIN push
+                        </p>
+                      </div>
+                    </div>
+                    {paymentMethod === method && (
+                      <CheckCircle2 className="w-5 h-5 text-[#FF5A1F]" />
                     )}
-                  </div>
-                </button>
-              )}
+                  </button>
+                );
+              })}
 
-              {/* Airtel Money (Tanzania / Zambia) */}
-              {activeHub.supportedPayments.includes('airtel_money') && (
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('airtel_money')}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                    paymentMethod === 'airtel_money'
-                      ? 'border-[#FF8A00] bg-[#FF8A00]/5 dark:bg-[#FF8A00]/10 shadow-xs'
-                      : 'border-[#E7E4DD] dark:border-[#3A3A3A] bg-[#F8F7F3] dark:bg-[#171717]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-950/60 flex items-center justify-center text-red-600 shrink-0 font-bold text-xs">
-                      A
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-[#242424] dark:text-white">
-                        {t.airtel_label}
-                      </div>
-                      <div className="text-xs text-[#707070] dark:text-[#B7B7B7]">
-                        Airtel push authorization
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                      paymentMethod === 'airtel_money'
-                        ? 'border-[#FF8A00] bg-[#FF8A00] text-white'
-                        : 'border-[#909090]'
-                    }`}
-                  >
-                    {paymentMethod === 'airtel_money' && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </div>
-                </button>
-              )}
-
-              {/* MTN Mobile Money (Zambia) */}
-              {activeHub.supportedPayments.includes('mtn_money') && (
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('mtn_money')}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                    paymentMethod === 'mtn_money'
-                      ? 'border-[#FF8A00] bg-[#FF8A00]/5 dark:bg-[#FF8A00]/10 shadow-xs'
-                      : 'border-[#E7E4DD] dark:border-[#3A3A3A] bg-[#F8F7F3] dark:bg-[#171717]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-yellow-100 dark:bg-yellow-950/60 flex items-center justify-center text-yellow-600 shrink-0 font-bold text-xs">
-                      MTN
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-[#242424] dark:text-white">
-                        {t.mtn_label}
-                      </div>
-                      <div className="text-xs text-[#707070] dark:text-[#B7B7B7]">
-                        MTN MoMo push notification
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                      paymentMethod === 'mtn_money'
-                        ? 'border-[#FF8A00] bg-[#FF8A00] text-white'
-                        : 'border-[#909090]'
-                    }`}
-                  >
-                    {paymentMethod === 'mtn_money' && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </div>
-                </button>
-              )}
-
-              {/* Card Payment (France / UK) */}
+              {/* Card Payment */}
               {activeHub.supportedPayments.includes('card') && (
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('card')}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-all cursor-pointer ${
                     paymentMethod === 'card'
-                      ? 'border-[#FF8A00] bg-[#FF8A00]/5 dark:bg-[#FF8A00]/10 shadow-xs'
-                      : 'border-[#E7E4DD] dark:border-[#3A3A3A] bg-[#F8F7F3] dark:bg-[#171717]'
+                      ? 'neu-pressed border border-[#FF5A1F]'
+                      : 'neu-button text-[#1A202C] dark:text-[#F0F4F8]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                       <CreditCard className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-[#242424] dark:text-white">
-                        {t.card_payment}
-                      </div>
-                      <div className="text-xs text-[#707070] dark:text-[#B7B7B7]">
-                        Visa, Mastercard, Apple Pay
-                      </div>
+                      <p className="text-sm font-bold text-[#1A202C] dark:text-[#F0F4F8]">
+                        Credit / Debit Card
+                      </p>
+                      <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+                        Visa, Mastercard, AMEX
+                      </p>
                     </div>
                   </div>
-                  <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                      paymentMethod === 'card'
-                        ? 'border-[#FF8A00] bg-[#FF8A00] text-white'
-                        : 'border-[#909090]'
-                    }`}
-                  >
-                    {paymentMethod === 'card' && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </div>
+                  {paymentMethod === 'card' && (
+                    <CheckCircle2 className="w-5 h-5 text-[#FF5A1F]" />
+                  )}
                 </button>
               )}
             </div>
           </div>
 
-          {/* Section 6: Fees Breakdown */}
-          <div className="p-3.5 rounded-2xl bg-[#F8F7F3] dark:bg-[#171717] border border-[#E7E4DD] dark:border-[#3A3A3A] space-y-1.5 text-xs text-[#707070] dark:text-[#B7B7B7] font-medium">
-            <div className="flex justify-between">
-              <span>{t.subtotal}</span>
-              <span className="font-mono tabular-nums text-[#242424] dark:text-white">
+          {/* Section 6: Cost Summary */}
+          <NeuCard elevation="flat" className="p-4 space-y-2">
+            <div className="flex justify-between text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+              <span>Subtotal</span>
+              <span className="font-mono tabular-nums text-[#1A202C] dark:text-[#F0F4F8]">
                 {formatCurrency(subtotal, activeHub.currency)}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>{t.delivery_fee}</span>
-              <span className="font-mono tabular-nums text-[#242424] dark:text-white">
+            <div className="flex justify-between text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+              <span>Delivery Fee</span>
+              <span className="font-mono tabular-nums text-[#1A202C] dark:text-[#F0F4F8]">
                 {formatCurrency(deliveryFee, activeHub.currency)}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>{t.service_fee}</span>
-              <span className="font-mono tabular-nums text-[#242424] dark:text-white">
+            <div className="flex justify-between text-xs text-[#5A6A80] dark:text-[#8B9BB4]">
+              <span>Service Fee</span>
+              <span className="font-mono tabular-nums text-[#1A202C] dark:text-[#F0F4F8]">
                 {formatCurrency(serviceFee, activeHub.currency)}
               </span>
             </div>
-            <div className="flex justify-between pt-1 border-t border-[#E7E4DD] dark:border-[#3A3A3A] text-sm font-bold text-[#242424] dark:text-white">
-              <span>{t.total}</span>
-              <span className="font-mono tabular-nums text-[#FF8A00]">
+            <div className="pt-2 border-t border-[#DCE4EF] dark:border-[#1F293D] flex justify-between text-base font-extrabold text-[#1A202C] dark:text-[#F0F4F8]">
+              <span>Total</span>
+              <span className="font-mono tabular-nums text-[#FF5A1F]">
                 {formatCurrency(total, activeHub.currency)}
               </span>
             </div>
-          </div>
+          </NeuCard>
         </div>
 
-        {/* Action Button: Full-Width 52px Primary Orange Button */}
-        <div className="p-4 border-t border-[#E7E4DD] dark:border-[#3A3A3A] bg-white dark:bg-[#222222] shrink-0">
-          <button
+        {/* Footer Place Order Button */}
+        <div className="p-4 bg-[#F8FAFF] dark:bg-[#111722] border-t border-[#DCE4EF] dark:border-[#1F293D] shrink-0">
+          <NeuButton
+            variant="primary"
+            size="lg"
+            fullWidth
             onClick={handleStartOrder}
             disabled={isSubmitting}
-            className="w-full h-[52px] rounded-xl bg-[#FF8A00] hover:bg-[#E87900] active:scale-[0.99] text-white font-semibold text-base flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-70"
           >
             {isSubmitting ? (
-              <>
+              <span className="flex items-center gap-2">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Processing Order...</span>
-              </>
+                <span>Creating Firestore Order...</span>
+              </span>
             ) : (
-              <>
-                <span>{t.place_order}</span>
-                <span className="font-mono tabular-nums">
-                  · {formatCurrency(total, activeHub.currency)}
+              <span className="flex items-center justify-between w-full">
+                <span>Place Starches Order</span>
+                <span className="font-mono tabular-nums font-extrabold">
+                  {formatCurrency(total, activeHub.currency)}
                 </span>
-              </>
+              </span>
             )}
-          </button>
+          </NeuButton>
         </div>
       </div>
 
-      {/* Realistic Mobile Money USSD Push Prompt Modal */}
+      {/* Mobile Money USSD Prompt Modal */}
       {showUssdPrompt && (
-        <div className="fixed inset-0 z-60 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white dark:bg-neutral-900 border border-[#E7E4DD] dark:border-neutral-700 text-[#242424] dark:text-white rounded-2xl p-5 shadow-2xl">
-            <div className="flex items-center gap-2 text-amber-500 dark:text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
-              <Smartphone className="w-4 h-4" />
-              <span>USSD Push Notification</span>
+        <div className="fixed inset-0 z-60 bg-black/75 flex items-center justify-center p-4">
+          <NeuCard elevation="flat" className="max-w-xs w-full p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#FF5A1F]/15 text-[#FF5A1F] mx-auto flex items-center justify-center">
+              <Smartphone className="w-6 h-6" />
             </div>
 
-            <h4 className="font-bold text-base mb-1 text-[#242424] dark:text-white">
-              Confirm Payment to STARCHES
-            </h4>
-            <p className="text-xs text-[#707070] dark:text-neutral-300 leading-relaxed mb-4">
-              Authorize payment of{' '}
-              <strong className="text-[#FF8A00] dark:text-amber-400 font-mono">
-                {formatCurrency(total, activeHub.currency)}
-              </strong>{' '}
-              for delivery order from {merchantName}.
-            </p>
+            <div>
+              <h4 className="font-bold text-base text-[#1A202C] dark:text-[#F0F4F8]">
+                Authorize Payment
+              </h4>
+              <p className="text-xs text-[#5A6A80] dark:text-[#8B9BB4] mt-1">
+                Enter your 4-digit mobile money PIN to confirm {formatCurrency(total, activeHub.currency)}
+              </p>
+            </div>
 
-            <form onSubmit={handleConfirmUssd} className="space-y-4">
-              <div>
-                <label className="text-[11px] text-[#707070] dark:text-neutral-400 block mb-1">
-                  Enter your Mobile Money 4-digit PIN:
-                </label>
-                <input
-                  type="password"
-                  maxLength={4}
-                  autoFocus
-                  value={ussdPin}
-                  onChange={(e) => setUssdPin(e.target.value)}
-                  placeholder="••••"
-                  className="w-full h-11 text-center font-mono text-lg tracking-widest bg-[#F8F7F3] dark:bg-neutral-800 border border-[#E7E4DD] dark:border-neutral-700 rounded-xl outline-none focus:border-[#FF8A00] text-[#242424] dark:text-white"
-                />
-                {ussdError && (
-                  <p className="text-xs text-red-500 mt-1">{ussdError}</p>
-                )}
-              </div>
+            <form onSubmit={handleConfirmUssd} className="space-y-3">
+              <input
+                type="password"
+                maxLength={4}
+                value={ussdPin}
+                onChange={(e) => setUssdPin(e.target.value)}
+                placeholder="••••"
+                className="w-32 mx-auto text-center font-mono text-2xl tracking-widest h-12 rounded-xl neu-pressed text-[#1A202C] dark:text-[#F0F4F8] outline-none"
+                autoFocus
+              />
+              {ussdError && (
+                <p className="text-xs text-red-500 font-semibold">{ussdError}</p>
+              )}
 
-              <div className="flex gap-2">
-                <button
+              <div className="flex gap-2 pt-2">
+                <NeuButton
+                  variant="secondary"
+                  size="md"
+                  fullWidth
                   type="button"
                   onClick={() => setShowUssdPrompt(false)}
-                  className="flex-1 h-10 rounded-xl bg-[#F1F0EB] dark:bg-neutral-800 hover:bg-[#E5E2DC] dark:hover:bg-neutral-700 text-[#707070] dark:text-neutral-300 text-xs font-semibold"
                 >
                   Cancel
-                </button>
-                <button
+                </NeuButton>
+                <NeuButton
+                  variant="primary"
+                  size="md"
+                  fullWidth
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 h-10 rounded-xl bg-[#FF8A00] hover:bg-[#E87900] text-white text-xs font-semibold flex items-center justify-center gap-1"
                 >
-                  {isSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Confirm PIN</span>
-                    </>
-                  )}
-                </button>
+                  {isSubmitting ? 'Verifying...' : 'Pay Now'}
+                </NeuButton>
               </div>
             </form>
-          </div>
+          </NeuCard>
         </div>
       )}
     </div>
